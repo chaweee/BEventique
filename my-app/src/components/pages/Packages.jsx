@@ -4,11 +4,16 @@ export default function Packages() {
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const safeJson = async (res) => {
+    const text = await res.text();
+    try { return JSON.parse(text); } catch { throw new Error(`Expected JSON, got: ${text.slice(0,200)}`); }
+  };
+
   useEffect(() => {
-    fetch("http://localhost/Eventique/api/packages.php")
-      .then((res) => res.json())
+    fetch('/Eventique/api/packages.php', { credentials: 'include' })
+      .then((res) => safeJson(res))
       .then((data) => {
-        setPackages(data.data || []);
+        setPackages(data.packages || data.data || []);
         setLoading(false);
       })
       .catch(() => setLoading(false));

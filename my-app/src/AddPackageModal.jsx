@@ -402,6 +402,17 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
         credentials: "include",
         body: fd,
       });
+
+      const contentType = res.headers.get("content-type") || "";
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}: ${text.slice(0,200)}`);
+      }
+      if (!contentType.includes("application/json")) {
+        const text = await res.text();
+        throw new Error("Expected JSON but received non-JSON response: " + text.slice(0,200));
+      }
+
       const json = await res.json();
       if (json?.status === "success") {
         if (onSaved) onSaved();

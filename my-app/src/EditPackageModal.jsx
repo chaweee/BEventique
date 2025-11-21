@@ -43,7 +43,18 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
     fetch(`/Eventique/api/get_package.php?id=${encodeURIComponent(packageId)}`, {
       credentials: "include",
     })
-      .then((r) => r.json())
+      .then(async (r) => {
+        const contentType = r.headers.get("content-type") || "";
+        if (!r.ok) {
+          const text = await r.text();
+          throw new Error(`HTTP ${r.status}: ${text.slice(0,200)}`);
+        }
+        if (!contentType.includes("application/json")) {
+          const text = await r.text();
+          throw new Error("Expected JSON but received non-JSON response: " + text.slice(0,200));
+        }
+        return r.json();
+      })
       .then((json) => {
         if (!mounted) return;
 
@@ -80,7 +91,7 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
       })
       .catch((e) => {
         console.error(e);
-        setError("Network error loading package");
+        setError(e.message || "Network error loading package");
       })
       .finally(() => mounted && setLoading(false));
 
@@ -158,6 +169,16 @@ useEffect(() => {
         credentials: "include",
         body: fd,
       });
+
+      const contentType = res.headers.get("content-type") || "";
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}: ${text.slice(0,200)}`);
+      }
+      if (!contentType.includes("application/json")) {
+        const text = await res.text();
+        throw new Error("Expected JSON but received non-JSON response: " + text.slice(0,200));
+      }
 
       const json = await res.json();
 
