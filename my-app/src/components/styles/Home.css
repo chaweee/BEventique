@@ -1,0 +1,44 @@
+.home-container {
+  width: 100%;
+  min-height: 100vh;
+  background: #fff6fb;
+}
+
+.hero {
+  text-align: center;
+  padding: 50px 20px;
+  background: linear-gradient(to bottom right, #f9d8e6, #ffeef8);
+  margin-bottom: 40px;
+}
+
+.hero h1 {
+  font-size: 38px;
+  color: #a94470;
+}
+
+.hero p {
+  color: #5f5063;
+}
+
+.hero-btn {
+  margin-top: 15px;
+  padding: 10px 20px;
+  background: #a94470;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.categories-section,
+.layouts-section {
+  padding: 40px;
+}
+
+.category-grid,
+.layout-grid {
+  display: flex;
+  gap: 30px;
+  flex-wrap: wrap;
+  justify-content: center;
+}

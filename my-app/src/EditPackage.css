@@ -1,0 +1,36 @@
+.editpkg-card { max-width: 1100px; margin: 18px auto; padding: 18px; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial; }
+.editpkg-grid { display: flex; gap: 20px; background: #fff; border-radius: 12px; padding: 18px; box-shadow: 0 10px 30px rgba(2,20,14,0.06); }
+.left-col { flex: 0 0 40%; display:flex; flex-direction:column; gap:12px; }
+.right-col { flex: 0 0 60%; display:flex; flex-direction:column; gap:12px; }
+
+.preview-box { width:100%; padding-top:56%; position:relative; border-radius:10px; overflow:hidden; background:#f4f9f6; border:1px solid #e8f3ee; display:flex; align-items:center; justify-content:center; }
+.preview-box .preview-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.preview-empty { color:#6b8b7a; }
+
+.thumbs-row { display:flex; gap:8px; flex-wrap:wrap; max-height:160px; overflow:auto; }
+.thumb-item { position:relative; width:80px; height:56px; border-radius:8px; overflow:hidden; border:1px solid #eef7f0; background:#fbfffd; }
+.thumb-img { width:100%; height:100%; object-fit:cover; cursor:pointer; display:block; }
+.thumb-remove { position:absolute; top:4px; right:4px; background:rgba(0,0,0,0.5); color:white; border:none; border-radius:50%; width:22px; height:22px; cursor:pointer; }
+
+.upload-row { display:flex; gap:12px; align-items:center; }
+.upload-btn { display:inline-block; padding:8px 12px; background:linear-gradient(90deg,#c8f5df,#a5edcd); border-radius:8px; cursor:pointer; }
+.upload-btn input { display:none; }
+.upload-note { color:#447a63; font-size:13px; }
+
+.form-row { display:flex; flex-direction:column; gap:6px; }
+.form-row label { font-weight:600; color:#123; font-size:13px; }
+.form-row input, .form-row textarea, .form-row select { padding:10px 12px; border-radius:8px; border:1px solid #e6f2ea; background:#fbfffd; font-size:14px; outline:none; }
+.two-cols { display:flex; gap:12px; }
+.two-cols > div { flex:1; display:flex; flex-direction:column; gap:6px; }
+
+.form-error { color:#7a1d1d; background:#fff1f2; padding:10px; border-radius:8px; }
+
+.form-actions { display:flex; gap:12px; margin-top:6px; }
+.btn { padding:10px 14px; border-radius:10px; border:none; cursor:pointer; font-weight:700; }
+.btn.save { background:linear-gradient(90deg,#26bfa0,#9fe9d0); color:#043; }
+.btn.cancel { background:transparent; border:1px solid #e6f2ea; color:#123; }
+
+@media (max-width: 920px) {
+  .editpkg-grid { flex-direction:column; }
+  .left-col, .right-col { flex: 1 1 auto; }
+}

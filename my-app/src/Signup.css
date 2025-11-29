@@ -1,0 +1,159 @@
+/* Pastel green two-column layout and glassmorphism */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+:root {
+  --p1: #a0304f; /* 160,48,79 */
+  --p2: #8d1638; /* 141,22,56 */
+  --p3: #7b0323; /* 123,3,35  */
+  --p4: #5b011b; /* 91,1,27   */
+  --p5: #3d0112; /* 61,1,18   */
+
+  --bg: linear-gradient(180deg, var(--p1), var(--p4));
+  --glass: rgba(255,255,255,0.06);
+  --glass-border: rgba(255,255,255,0.10);
+  --accent: #ffb6c7; /* light accent for controls */
+  --accent-2: #ffd6dc;
+  --muted: #ffffff;
+  --shadow: rgba(0,0,0,0.5);
+}
+
+* { box-sizing: border-box; }
+html,body,#root { height: 100%; }
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  background: var(--bg);
+  color: var(--muted);
+}
+
+/* container */
+.signup-root {
+  min-height: 100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding: 32px;
+}
+
+/* split */
+.signup-split {
+  width: 100%;
+  max-width: 1100px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  align-items: stretch;
+}
+
+/* left form */
+.signup-left { display:flex; align-items:center; justify-content:center; }
+.glass-card {
+  width:100%;
+  max-width:560px;
+  padding:28px;
+  border-radius:18px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+  backdrop-filter: blur(10px) saturate(115%);
+  -webkit-backdrop-filter: blur(10px) saturate(115%);
+  display:flex;
+  flex-direction:column;
+  /* Use dark text inside the translucent glass card for good contrast */
+  color: #111827; /* dark slate */
+}
+
+.glass-title {
+  margin: 0 0 18px 0;
+  font-size: 28px;
+  font-weight:700;
+  color: inherit;
+}
+
+/* columns for name inputs */
+.cols {
+  display:grid;
+  grid-template-columns: 1fr 0.28fr 1fr;
+  gap:12px;
+  margin-bottom:10px;
+}
+.two-cols {
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:12px;
+}
+
+/* actions & footer */
+.actions { margin-top:12px; }
+.form-error {
+  margin-top:10px;
+  padding:10px;
+  background: rgba(255, 220, 225, 0.12);
+  color: #7a1d1d;
+  border-radius:8px;
+}
+.foot-row {
+  margin-top:14px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  font-size:13px;
+  color: rgba(17,24,39,0.85);
+}
+.link-btn {
+  background:none;
+  border:none;
+  color: var(--p2);
+  font-weight:700;
+  cursor:pointer;
+  text-decoration: underline;
+}
+
+.signin-link { color: rgba(17,24,39,0.95); }
+.copyright { color: rgba(17,24,39,0.6); font-size:12px; }
+
+/* right panel (image placeholder) */
+.signup-right { display:flex; align-items:center; justify-content:center; }
+.image-panel {
+  width:100%;
+  max-width:560px;
+  min-height:520px;
+  border-radius:18px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.18));
+  border:1px solid rgba(255,255,255,0.04);
+  box-shadow: 0 28px 80px rgba(0,0,0,0.6);
+}
+
+/* modal */
+.modal-backdrop {
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: rgba(8,20,40,0.45);
+  z-index:80;
+}
+.modal-card {
+  width:100%;
+  max-width:480px;
+  background: rgba(0,0,0,0.68);
+  border-radius:12px;
+  padding:18px;
+  border:1px solid rgba(255,255,255,0.04);
+  box-shadow: 0 28px 80px rgba(0,0,0,0.6);
+  text-align:center;
+}
+.modal-card h3 { margin:0 0 8px; font-size:20px; color:var(--muted); }
+.modal-card p { margin:0 0 12px; color: rgba(255,255,255,0.85); }
+.modal-actions { display:flex; justify-content:center; gap:12px; }
+
+/* responsive */
+@media (max-width: 920px) {
+  .signup-split { grid-template-columns: 1fr; }
+  .image-panel { min-height:260px; }
+  .cols { grid-template-columns: 1fr; }
+  .two-cols { grid-template-columns: 1fr; }
+}

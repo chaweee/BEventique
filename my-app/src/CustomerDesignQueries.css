@@ -1,0 +1,483 @@
+/* Customer Design Queries - Messenger Style */
+
+.cdq-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f0f2f5;
+}
+
+/* Header */
+.cdq-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.cdq-brand {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: white;
+  cursor: pointer;
+}
+
+.cdq-nav {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.cdq-nav button {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.cdq-nav button:hover,
+.cdq-nav button.active {
+  color: white;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.cdq-logout {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+/* Main Messenger Container */
+.cdq-main {
+  flex: 1;
+  padding: 2rem;
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.cdq-messenger {
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  height: calc(100vh - 150px);
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* Sidebar - Thread List */
+.cdq-sidebar {
+  border-right: 1px solid #e4e6eb;
+  display: flex;
+  flex-direction: column;
+  background: white;
+}
+
+.cdq-sidebar-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #e4e6eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cdq-sidebar-header h2 {
+  font-size: 1.5rem;
+  margin: 0;
+  color: #050505;
+}
+
+.cdq-new-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s;
+}
+
+.cdq-new-btn:hover {
+  transform: scale(1.1);
+}
+
+.cdq-thread-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.cdq-thread-item {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e4e6eb;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.cdq-thread-item:hover {
+  background: #f0f2f5;
+}
+
+.cdq-thread-item.active {
+  background: #e7f3ff;
+  border-left: 4px solid #667eea;
+}
+
+.thread-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.thread-subject {
+  font-weight: 600;
+  color: #050505;
+  font-size: 0.95rem;
+}
+
+.unread-badge {
+  background: #667eea;
+  color: white;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.thread-preview {
+  color: #65676b;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.thread-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.thread-status {
+  font-size: 0.75rem;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  text-transform: capitalize;
+}
+
+.thread-time {
+  font-size: 0.75rem;
+  color: #8a8d91;
+}
+
+.cdq-empty-sidebar {
+  padding: 2rem;
+  text-align: center;
+  color: #65676b;
+}
+
+.cdq-empty-sidebar button {
+  margin-top: 1rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Conversation Panel */
+.cdq-conversation {
+  display: flex;
+  flex-direction: column;
+  background: white;
+}
+
+.cdq-no-selection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #65676b;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.cdq-no-selection h2 {
+  margin: 0 0 0.5rem 0;
+  color: #050505;
+}
+
+/* Conversation Header */
+.cdq-conv-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e4e6eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cdq-conv-header h3 {
+  margin: 0 0 0.25rem 0;
+  color: #050505;
+}
+
+.conv-meta {
+  font-size: 0.875rem;
+  color: #65676b;
+  margin: 0;
+}
+
+.cdq-close-conv {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #f0f2f5;
+  border: none;
+  cursor: pointer;
+  font-size: 1.25rem;
+  color: #65676b;
+}
+
+/* Messages Area */
+.cdq-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  background: #f0f2f5;
+}
+
+.cdq-message {
+  margin-bottom: 1rem;
+  display: flex;
+}
+
+.cdq-message.customer {
+  justify-content: flex-end;
+}
+
+.cdq-message.designer {
+  justify-content: flex-start;
+}
+
+.message-bubble {
+  max-width: 65%;
+  padding: 0.75rem 1rem;
+  border-radius: 18px;
+}
+
+.cdq-message.customer .message-bubble {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.cdq-message.designer .message-bubble {
+  background: #e4e6eb;
+  color: #050505;
+}
+
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.cdq-message.customer .message-header {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.cdq-message.designer .message-header {
+  color: #65676b;
+}
+
+.message-time {
+  font-size: 0.7rem;
+  margin-left: 0.5rem;
+}
+
+.message-text {
+  font-size: 0.938rem;
+  line-height: 1.4;
+}
+
+/* Message Input */
+.cdq-message-input {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e4e6eb;
+  display: flex;
+  gap: 0.75rem;
+  background: white;
+}
+
+.cdq-message-input input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e4e6eb;
+  border-radius: 20px;
+  font-size: 0.938rem;
+  outline: none;
+}
+
+.cdq-message-input input:focus {
+  border-color: #667eea;
+}
+
+.cdq-message-input button {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform 0.2s;
+}
+
+.cdq-message-input button:hover {
+  transform: scale(1.05);
+}
+
+/* Modal */
+.cdq-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.cdq-modal {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.cdq-modal-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #e4e6eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cdq-modal-header h2 {
+  margin: 0;
+  color: #050505;
+}
+
+.cdq-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f0f2f5;
+  border: none;
+  cursor: pointer;
+  font-size: 1.5rem;
+  color: #65676b;
+}
+
+/* Form */
+.cdq-form {
+  padding: 1.5rem;
+}
+
+.cdq-form-group {
+  margin-bottom: 1.25rem;
+}
+
+.cdq-form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #050505;
+}
+
+.cdq-form-group input,
+.cdq-form-group textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #e4e6eb;
+  border-radius: 8px;
+  font-size: 0.938rem;
+  outline: none;
+}
+
+.cdq-form-group input:focus,
+.cdq-form-group textarea:focus {
+  border-color: #667eea;
+}
+
+.cdq-form-group small {
+  display: block;
+  margin-top: 0.25rem;
+  color: #65676b;
+  font-size: 0.813rem;
+}
+
+.cdq-form-error {
+  background: #fee;
+  color: #c00;
+  padding: 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.cdq-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.cdq-cancel-btn,
+.cdq-submit-btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.cdq-cancel-btn {
+  background: #f0f2f5;
+  color: #050505;
+}
+
+.cdq-submit-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.cdq-loading {
+  padding: 2rem;
+  text-align: center;
+  color: #65676b;
+}

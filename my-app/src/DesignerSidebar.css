@@ -1,0 +1,83 @@
+.designer-sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  display: flex;
+}
+
+.designer-sidebar .MuiSidebar-root {
+  width: 250px !important;
+  min-width: 250px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header with title */
+.sidebar-header {
+  padding: 24px 20px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: white;
+  letter-spacing: 0.3px;
+}
+
+/* Menu item styling */
+.designer-sidebar .MuiMenuItem-root {
+  padding: 12px 20px;
+  margin: 4px 0;
+  border-radius: 0;
+  font-size: 15px;
+  transition: background 0.2s;
+}
+
+.designer-sidebar .MuiMenuItem-root:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.designer-sidebar .MuiMenuItem-root.Mui-selected {
+  background: rgba(255, 255, 255, 0.15);
+  font-weight: 500;
+}
+
+/* Footer copyright */
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Hide any unwanted subheadings */
+.designer-sidebar .MuiMenu-subHeading {
+  display: none !important;
+}
+
+/* Hide the menu subheader text */
+.designer-sidebar .MuiListSubheader-root {
+  display: none !important;
+}
+
+/* Hide any text nodes that contain 'menu' */
+.designer-sidebar .MuiMenu-root::before {
+  content: none !important;
+}
+
+.designer-sidebar .MuiMenu-root > *:not(.MuiMenuItem-root) {
+  display: none !important;
+}
+
+/* Hide the profile card at bottom */
+.designer-sidebar .MuiAvatar-root,
+.designer-sidebar [class*="profile"],
+.designer-sidebar [class*="Profile"],
+.designer-sidebar [class*="user"],
+.designer-sidebar [class*="User"] {
+  display: none !important;
+}
+

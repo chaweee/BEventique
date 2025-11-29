@@ -1,0 +1,390 @@
+/* Designer Queries - Messenger Style */
+
+.dq-root {
+  display: flex;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #858383 0%, #6e6e6e 100%);
+}
+
+/* Legacy sidebar brand styles removed; using DesignerSidebar.css */
+
+.dq-nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.dq-nav button {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  padding: 1rem 1.5rem;
+  text-align: left;
+  cursor: pointer;
+  gap: 0; /* remove gap to bring title flush to logo */
+  font-size: 1rem;
+}
+
+.dq-nav button:hover,
+.dq-nav button.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+/* Logout button */
+.dq-logout {
+  margin: auto 1.5rem 0 1.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  padding: 0.75rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background .2s;
+}
+
+.dq-logout:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+/* Main Content */
+.dq-main {
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.dq-messenger {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  height: calc(100vh - 3rem);
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+/* Threads Sidebar */
+.dq-threads-sidebar {
+  border-right: 1px solid #e4e6eb;
+  display: flex;
+  flex-direction: column;
+  background: white;
+}
+
+.dq-sidebar-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #e4e6eb;
+}
+
+.dq-sidebar-header h2 {
+  font-size: 1.5rem;
+  margin: 0;
+  color: #050505;
+}
+
+/* Filter Tabs */
+.dq-filter-tabs {
+  display: flex;
+  padding: 0.5rem;
+  border-bottom: 1px solid #e4e6eb;
+  gap: 0.25rem;
+  overflow-x: auto;
+}
+
+.filter-tab {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: none;
+  color: #65676b;
+  cursor: pointer;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  text-transform: capitalize;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.filter-tab:hover {
+  background: #f0f2f5;
+}
+
+.filter-tab.active {
+  background: #e7f3ff;
+  color: #1877f2;
+  font-weight: 600;
+}
+
+/* Thread List */
+.dq-thread-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.dq-thread-item {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e4e6eb;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.dq-thread-item:hover {
+  background: #f0f2f5;
+}
+
+.dq-thread-item.active {
+  background: #e7f3ff;
+  border-left: 4px solid #1877f2;
+}
+
+.thread-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.thread-customer {
+  font-weight: 600;
+  color: #050505;
+  font-size: 0.95rem;
+}
+
+.thread-subject {
+  color: #050505;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.thread-preview {
+  color: #65676b;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.thread-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.thread-status {
+  font-size: 0.75rem;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  text-transform: capitalize;
+}
+
+.thread-time {
+  font-size: 0.75rem;
+  color: #8a8d91;
+}
+
+.unread-badge {
+  background: #1877f2;
+  color: white;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.dq-empty-sidebar {
+  padding: 2rem;
+  text-align: center;
+  color: #65676b;
+}
+
+/* Conversation Panel */
+.dq-conversation {
+  display: flex;
+  flex-direction: column;
+  background: white;
+}
+
+.dq-no-selection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #65676b;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.dq-no-selection h2 {
+  margin: 0 0 0.5rem 0;
+  color: #050505;
+}
+
+/* Conversation Header */
+.dq-conv-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e4e6eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dq-conv-header h3 {
+  margin: 0 0 0.25rem 0;
+  color: #050505;
+}
+
+.conv-subject {
+  font-size: 0.938rem;
+  font-weight: 500;
+  color: #050505;
+  margin: 0 0 0.25rem 0;
+}
+
+.conv-meta {
+  font-size: 0.813rem;
+  color: #65676b;
+  margin: 0;
+}
+
+.conv-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.assign-btn {
+  padding: 0.5rem 1rem;
+  background: #1877f2;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.status-select {
+  padding: 0.5rem;
+  border: 1px solid #e4e6eb;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.dq-close-conv {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #f0f2f5;
+  border: none;
+  cursor: pointer;
+  font-size: 1.25rem;
+  color: #65676b;
+}
+
+/* Messages Area */
+.dq-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  background: #f0f2f5;
+}
+
+.dq-message {
+  margin-bottom: 1rem;
+  display: flex;
+}
+
+.dq-message.customer {
+  justify-content: flex-start;
+}
+
+.dq-message.designer {
+  justify-content: flex-end;
+}
+
+.message-bubble {
+  max-width: 65%;
+  padding: 0.75rem 1rem;
+  border-radius: 18px;
+}
+
+.dq-message.customer .message-bubble {
+  background: #e4e6eb;
+  color: #050505;
+}
+
+.dq-message.designer .message-bubble {
+  background: linear-gradient(135deg, #1877f2 0%, #0d5dbf 100%);
+  color: white;
+}
+
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.dq-message.customer .message-header {
+  color: #65676b;
+}
+
+.dq-message.designer .message-header {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.message-time {
+  font-size: 0.7rem;
+  margin-left: 0.5rem;
+}
+
+.message-text {
+  font-size: 0.938rem;
+  line-height: 1.4;
+}
+
+/* Message Input */
+.dq-message-input {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e4e6eb;
+  display: flex;
+  gap: 0.75rem;
+  background: white;
+}
+
+.dq-message-input input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e4e6eb;
+  border-radius: 20px;
+  font-size: 0.938rem;
+  outline: none;
+}
+
+.dq-message-input input:focus {
+  border-color: #1877f2;
+}
+
+.dq-message-input button {
+  padding: 0.75rem 1.5rem;
+  background: #1877f2;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.dq-message-input button:hover {
+  background: #0d5dbf;
+}
+
+.dq-loading {
+  padding: 2rem;
+  text-align: center;
+  color: #65676b;
+}

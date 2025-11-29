@@ -1,0 +1,404 @@
+/* Booking Page */
+:root {
+  --bp-primary: #26bfa0;
+  --bp-dark: #083a31;
+  --bp-navbar: #997a4a;
+  --bp-light-bg: #f6fbf8;
+}
+
+.bp-root {
+  min-height: 100vh;
+  background: var(--bp-light-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.bp-header {
+  background: var(--bp-navbar);
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.bp-brand {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: white;
+  cursor: pointer;
+  font-family: 'Poppins', serif;
+}
+
+.bp-back {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.bp-back:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Main */
+.bp-main {
+  flex: 1;
+  padding: 2rem;
+}
+
+.bp-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 500px;
+  gap: 2rem;
+}
+
+/* Canvas Section */
+.bp-canvas-section {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.bp-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.bp-section-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--bp-dark);
+}
+
+.bp-customize-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.bp-customize-checkbox input {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.bp-customize-checkbox span {
+  font-size: 0.938rem;
+  color: var(--bp-dark);
+}
+
+.bp-canvas-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+#bookingCanvas {
+  display: block;
+}
+
+/* Canvas Tools */
+.bp-canvas-tools {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.bp-tools-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.bp-tools-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  color: var(--bp-dark);
+}
+
+.bp-tools-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.bp-tool-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bp-tool-btn.delete {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.bp-tool-btn.delete:hover {
+  background: #fecaca;
+}
+
+.bp-tool-btn.clear {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.bp-tool-btn.clear:hover {
+  background: #d1d5db;
+}
+
+.bp-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.75rem;
+}
+
+.bp-tool-item {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+
+.bp-tool-item:hover {
+  border-color: var(--bp-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(38, 191, 160, 0.2);
+}
+
+.bp-tool-item.active {
+  border-color: var(--bp-primary);
+  background: #ecfdf5;
+}
+
+.tool-icon {
+  font-size: 2rem;
+  color: var(--bp-primary);
+}
+
+.bp-tool-item span {
+  font-size: 0.813rem;
+  font-weight: 600;
+  color: var(--bp-dark);
+  text-align: center;
+}
+
+/* Form Section */
+.bp-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.bp-package-info {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.bp-package-info h2 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.5rem;
+  color: var(--bp-dark);
+}
+
+.bp-package-price {
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--bp-primary);
+  margin-bottom: 1rem;
+}
+
+.bp-package-specs {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.bp-spec-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.bp-spec-row:last-child {
+  border-bottom: none;
+}
+
+.bp-spec-row span {
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.bp-spec-row strong {
+  color: var(--bp-primary);
+  font-weight: 600;
+}
+
+.bp-package-desc {
+  margin-top: 1rem;
+}
+
+.bp-package-desc h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+  color: var(--bp-dark);
+}
+
+.bp-package-desc p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+/* Booking Form */
+.bp-booking-form {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.bp-booking-form h3 {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.25rem;
+  color: var(--bp-dark);
+}
+
+.bp-form-group {
+  margin-bottom: 1.25rem;
+}
+
+.bp-form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--bp-dark);
+  font-size: 0.875rem;
+}
+
+.bp-form-group input,
+.bp-form-group textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.938rem;
+  font-family: 'Poppins', sans-serif;
+  transition: border-color 0.2s;
+}
+
+.bp-form-group input:focus,
+.bp-form-group textarea:focus {
+  outline: none;
+  border-color: var(--bp-primary);
+}
+
+.bp-form-group textarea {
+  resize: vertical;
+}
+
+.bp-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.bp-form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.bp-cancel-btn,
+.bp-submit-btn {
+  flex: 1;
+  padding: 0.875rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.bp-cancel-btn {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.bp-cancel-btn:hover {
+  background: #e5e7eb;
+}
+
+.bp-submit-btn {
+  background: var(--bp-primary);
+  color: white;
+}
+
+.bp-submit-btn:hover {
+  background: #1a9b7f;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(38, 191, 160, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .bp-container {
+    grid-template-columns: 1fr;
+  }
+
+  .bp-form-section {
+    max-width: 600px;
+    margin: 0 auto;
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .bp-main {
+    padding: 1rem;
+  }
+
+  .bp-canvas-container canvas {
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  .bp-tools-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .bp-form-row {
+    grid-template-columns: 1fr;
+  }
+}
