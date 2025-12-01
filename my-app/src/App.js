@@ -11,8 +11,11 @@ import CustomerDesignQueries from "./CustomerDesignQueries";
 import DesignerPackages from "./DesignerPackages";
 import DesignerQueries from "./DesignerQueries";
 import DesignManagement from "./DesignManagement";
+<<<<<<< HEAD
 import BookingManagement from "./BookingManagement";
 import AdminDashboard from "./AdminDashboard";
+=======
+>>>>>>> 751e909a9f46c3c11abda563f196964a8127bc90
 
 
 function RequireAuth({ children, adminOnly = false }) {
@@ -78,6 +81,7 @@ function App() {
           }
         />
 
+<<<<<<< HEAD
         {/* Admin Dashboard (protected) */}
 
         <Route 
@@ -95,6 +99,24 @@ function App() {
           element={
             <RequireAuth>
               <BookingManagement />
+=======
+        {/* Booking Page (protected) */}
+        <Route
+          path="/booking"
+          element={
+            <RequireAuth>
+              <BookingPage />
+            </RequireAuth>
+          }
+        />
+
+        {/* Customer Design Queries (protected) */}
+        <Route
+          path="/design-queries"
+          element={
+            <RequireAuth>
+              <CustomerDesignQueries />
+>>>>>>> 751e909a9f46c3c11abda563f196964a8127bc90
             </RequireAuth>
           }
         />
