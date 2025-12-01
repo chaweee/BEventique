@@ -73,7 +73,11 @@ export default function Login() {
     setShowSuccess(false);
     const role = (loggedUser?.role || loggedUser?.Role || "").toString().toLowerCase();
     if (role === "admin") {
+<<<<<<< HEAD
+      navigate("/admin-dashboard");
+=======
       navigate("/admin");
+>>>>>>> 751e909a9f46c3c11abda563f196964a8127bc90
     } else if (role === "designer") {
       navigate("/designer-packages");
     } else {
@@ -148,3 +152,7 @@ export default function Login() {
     </div>
   );
 }
+<<<<<<< HEAD
+
+=======
+>>>>>>> 751e909a9f46c3c11abda563f196964a8127bc90

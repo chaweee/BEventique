@@ -47,7 +47,7 @@ app.use(cors({
         return callback(null, true);
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
@@ -169,38 +169,15 @@ app.use("/uploads", express.static(__dirname + "/uploads"));
             res.json({ error: err.message });
         }
     });
-
+    
     // Routes (after DB is ready)
+    app.use("/api/admin", require("./routes/admin"));
     app.use("/api/auth", require("./routes/auth"));
+    app.use("/api/bookings", require("./routes/bookings"));
+    app.use("/api/design", require("./routes/design"));
     app.use("/api/packages", require("./routes/packages"));
     app.use("/api/upload", require("./routes/upload"));
-    app.use("/api/design", require("./routes/design"));
-    app.use("/api/queries", require("./routes/queries"));
-    app.use("/api/bookings", require("./routes/bookings"));
-
-    // Socket.IO for real-time messaging
-    io.on("connection", (socket) => {
-        console.log("✅ Socket.IO client connected:", socket.id);
-
-        // Join a thread room
-        socket.on("join_thread", (threadId) => {
-            socket.join(`thread_${threadId}`);
-        });
-
-        // Leave a thread room
-        socket.on("leave_thread", (threadId) => {
-            socket.leave(`thread_${threadId}`);
-        });
-
-        // Handle disconnect
-        socket.on("disconnect", () => {
-            // Silent disconnect - normal during dev hot reload
-        });
-    });
-
-    // Make io available to routes
-    global.io = io;
-
+    
     // Global Express error handler
     app.use((err, req, res, next) => {
         console.error('❌ Express Error:', err.message);
