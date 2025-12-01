@@ -4,11 +4,7 @@
   --accent:#26bfa0;
   --muted:#083a31;
   --card-shadow: 0 12px 40px rgba(6,55,44,0.06);
-<<<<<<< HEAD
   --navbar-bg: #997a4a;
-=======
-  --navbar-bg: #9b7950;
->>>>>>> 751e909a9f46c3c11abda563f196964a8127bc90
   --navbar-accent: #c9a96e;
 }
 *{box-sizing:border-box}
@@ -19,11 +15,7 @@ body{font-family:'Poppins', Inter, system-ui, -apple-system; margin:0; backgroun
 /* navbar */
 .ch-navbar {
   display:flex; align-items:center; justify-content:center;
-<<<<<<< HEAD
   padding:0; height:60px; background:var(--navbar-bg);
-=======
-  padding:0; height:60px; background:#997a4a;
->>>>>>> 751e909a9f46c3c11abda563f196964a8127bc90
   box-shadow: 0 8px 20px rgba(0,0,0,0.15);
 }
 
