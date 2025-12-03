@@ -12,7 +12,10 @@ import DesignerPackages from "./DesignerPackages";
 import DesignerQueries from "./DesignerQueries";
 import DesignManagement from "./DesignManagement";
 import BookingManagement from "./BookingManagement";
-import AdminDashboard from "./AdminDashboard";
+import AdminDashboardPage from "./AdminDashboardPage";
+import AdminManageEventsPage from "./AdminManageEventsPage";
+import AdminManagePaymentsPage from "./AdminManagePaymentsPage";
+import AdminCustomerQueriesPage from "./AdminCustomerQueriesPage";
 
 
 function RequireAuth({ children, adminOnly = false }) {
@@ -103,7 +106,37 @@ function App() {
           path="/admin-dashboard" 
           element={
             <RequireAuth adminOnly={true}>
-              <AdminDashboard />
+              <AdminDashboardPage />
+            </RequireAuth>
+          } 
+        />
+
+        {/* Admin Manage Events (protected) */}
+        <Route 
+          path="/admin/manage-events" 
+          element={
+            <RequireAuth adminOnly={true}>
+              <AdminManageEventsPage />
+            </RequireAuth>
+          } 
+        />
+
+        {/* Admin Manage Payments (protected) */}
+        <Route 
+          path="/admin/manage-payments" 
+          element={
+            <RequireAuth adminOnly={true}>
+              <AdminManagePaymentsPage />
+            </RequireAuth>
+          } 
+        />
+
+        {/* Admin Customer Queries (protected) */}
+        <Route 
+          path="/admin/customer-queries" 
+          element={
+            <RequireAuth adminOnly={true}>
+              <AdminCustomerQueriesPage />
             </RequireAuth>
           } 
         />

@@ -8,21 +8,34 @@ const router = express.Router();
 router.post("/create", async (req, res) => {
     try {
         const {
-            client_id,
+            customer_id,
             package_id,
             event_type,
             event_date,
             event_time,
             location,
-            guest_count,
-            notes
+            notes,
+            custom_layout
         } = req.body;
 
+        // Log the received data for debugging
+        console.log("Booking Create Request - Received Data:");
+        console.log("customer_id:", customer_id);
+        console.log("package_id:", package_id);
+        console.log("event_date:", event_date);
+        console.log("location:", location);
+        console.log("Full body:", req.body);
+
         // Basic Validation
-        if (!client_id || !package_id || !event_date || !location) {
+        if (!customer_id || !package_id || !event_date || !location) {
+            console.log("Validation failed:");
+            console.log("customer_id:", !!customer_id, customer_id);
+            console.log("package_id:", !!package_id, package_id);
+            console.log("event_date:", !!event_date, event_date);
+            console.log("location:", !!location, location);
             return res.status(400).json({
                 status: "error",
-                message: "Missing required fields (Client, Package, Date, or Location)"
+                message: "Missing required fields (Customer, Package, Date, or Location)"
             });
         }
 
@@ -39,26 +52,28 @@ router.post("/create", async (req, res) => {
             });
         }
 
-        // Get Package Price to calculate total (Optional logic)
+        // Get Package Price to calculate total
         const [pkgRows] = await global.db.query("SELECT Package_Amount FROM package WHERE Package_ID = ?", [package_id]);
-        const packagePrice = pkgRows.length ? pkgRows[0].Package_Amount : 0;
+        const basePrice = pkgRows.length ? pkgRows[0].Package_Amount : 0;
+        const totalPrice = basePrice; // Can be modified later for discounts, etc.
         
         // Insert Booking
         const sql = `
             INSERT INTO bookings 
-            (client_id, package_id, event_type, event_date, event_time, location, guest_count, total_amount, notes, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+            (customer_id, package_id, event_date, event_time, location, base_price, total_price, custom_layout, has_custom_layout, notes, status, payment_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid')
         `;
 
         const [result] = await global.db.query(sql, [
-            client_id,
+            customer_id,
             package_id,
-            event_type,
             event_date,
             event_time,
             location,
-            guest_count || 0,
-            packagePrice, // Defaulting total_amount to package price
+            basePrice,
+            totalPrice,
+            custom_layout || null,
+            custom_layout ? 1 : 0,
             notes || null
         ]);
 
@@ -69,10 +84,11 @@ router.post("/create", async (req, res) => {
         });
 
     } catch (err) {
-        console.error("Create booking error:", err);
+        console.error("❌ Create booking error:", err.message);
+        console.error("Stack trace:", err.stack);
         return res.status(500).json({
             status: "error",
-            message: "Server error creating booking"
+            message: "Server error creating booking: " + err.message
         });
     }
 });
@@ -91,7 +107,7 @@ router.get("/all", async (req, res) => {
                 a.PhoneNumber AS client_phone,
                 p.Package_Name
             FROM bookings b
-            JOIN account a ON b.client_id = a.Account_ID
+            JOIN account a ON b.customer_id = a.Account_ID
             JOIN package p ON b.package_id = p.Package_ID
             ORDER BY b.event_date ASC
         `;
@@ -111,11 +127,11 @@ router.get("/all", async (req, res) => {
 
 // ============================================================
 // 3. GET MY BOOKINGS (For Client Dashboard)
-// GET /api/bookings/my-bookings/:client_id
+// GET /api/bookings/my-bookings/:customer_id
 // ============================================================
-router.get("/my-bookings/:client_id", async (req, res) => {
+router.get("/my-bookings/:customer_id", async (req, res) => {
     try {
-        const { client_id } = req.params;
+        const { customer_id } = req.params;
 
         const sql = `
             SELECT 
@@ -125,11 +141,11 @@ router.get("/my-bookings/:client_id", async (req, res) => {
                 p.Package_Amount
             FROM bookings b
             JOIN package p ON b.package_id = p.Package_ID
-            WHERE b.client_id = ?
+            WHERE b.customer_id = ?
             ORDER BY b.created_at DESC
         `;
 
-        const [rows] = await global.db.query(sql, [client_id]);
+        const [rows] = await global.db.query(sql, [customer_id]);
 
         return res.json({
             status: "success",

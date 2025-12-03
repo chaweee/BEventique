@@ -24,7 +24,7 @@ export default function BookingPage() {
   // Get user info
   const getCustomerId = () => {
     const user = JSON.parse(sessionStorage.getItem("user") || "{}");
-    return user.Account_ID || localStorage.getItem("userId");
+    return user.id || user.Account_ID || localStorage.getItem("userId");
   };
 
   // Initialize canvas
@@ -238,6 +238,32 @@ export default function BookingPage() {
     try {
       const customerId = getCustomerId();
       
+      // Validate all required fields
+      if (!customerId) {
+        alert("Error: Could not find user ID. Please log in again.");
+        return;
+      }
+
+      if (!bookingForm.location.trim()) {
+        alert("Please enter a location");
+        return;
+      }
+
+      if (!bookingForm.event_date) {
+        alert("Please select an event date");
+        return;
+      }
+
+      if (!bookingForm.event_time) {
+        alert("Please select an event time");
+        return;
+      }
+
+      if (!packageData.Package_ID && !packageData.id) {
+        alert("Error: Package ID not found. Please go back and select a package again.");
+        return;
+      }
+      
       // Get canvas layout
       let canvasLayout = null;
       if (fabricCanvas && allowCustomization) {
@@ -246,20 +272,34 @@ export default function BookingPage() {
 
       const bookingData = {
         customer_id: customerId,
-        package_id: packageData.Package_ID,
-        location: bookingForm.location,
+        package_id: packageData.Package_ID || packageData.id,
+        location: bookingForm.location.trim(),
         event_date: bookingForm.event_date,
         event_time: bookingForm.event_time,
-        special_requests: bookingForm.special_requests,
-        custom_layout: canvasLayout,
-        total_amount: packageData.Package_Amount,
-        status: "pending"
+        notes: bookingForm.special_requests,
+        custom_layout: canvasLayout
       };
 
-      // TODO: Send to API
-      console.log("Booking data:", bookingData);
-      alert("Booking submitted successfully!");
-      navigate("/customer-packages");
+      console.log("Sending booking data:", bookingData);
+      console.log("packageData:", packageData);
+
+      // Send booking to API
+      const response = await fetch("http://localhost:3001/api/bookings/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(bookingData)
+      });
+
+      const result = await response.json();
+
+      if (result.status === "success") {
+        alert("Booking submitted successfully!");
+        navigate("/bookings");
+      } else {
+        alert("Error: " + (result.message || "Failed to submit booking"));
+      }
 
     } catch (err) {
       console.error("Booking error:", err);

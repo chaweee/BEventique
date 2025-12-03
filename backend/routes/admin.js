@@ -16,7 +16,7 @@ router.get("/stats", async (req, res) => {
         const [userCount] = await global.db.query("SELECT COUNT(*) as count FROM account WHERE Role = 'customer'");
 
         // 4. Total Revenue (Sum of confirmed/completed bookings)
-        const [revenue] = await global.db.query("SELECT SUM(total_amount) as total FROM bookings WHERE status IN ('confirmed', 'completed')");
+        const [revenue] = await global.db.query("SELECT SUM(total_price) as total FROM bookings WHERE status IN ('confirmed', 'completed')");
 
         return res.json({
             status: "success",
@@ -44,12 +44,12 @@ router.get("/payments", async (req, res) => {
             SELECT 
                 b.booking_id,
                 b.event_date,
-                b.total_amount,
+                b.total_price,
                 b.status as booking_status,
-                CONCAT(a.FirstName, ' ', a.LastName) as client_name,
+                CONCAT(a.Firstname, ' ', a.Lastname) as client_name,
                 p.Package_Name
             FROM bookings b
-            JOIN account a ON b.client_id = a.Account_ID
+            JOIN account a ON b.customer_id = a.Account_ID
             JOIN package p ON b.package_id = p.Package_ID
             ORDER BY b.event_date DESC
         `;
