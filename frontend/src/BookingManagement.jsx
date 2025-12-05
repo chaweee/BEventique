@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "./BookingManagement.css";
 
@@ -9,12 +9,18 @@ export default function BookingManagement() {
   // State
   const [bookings, setBookings] = useState([]);
   const [packages, setPackages] = useState([]);
+  const [selectedPackage, setSelectedPackage] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState("create"); // 'create' or 'edit'
+  
+  // Canvas customization state
+  const [allowCustomize, setAllowCustomize] = useState(false);
+  const canvasRef = useRef(null);
+  const fabricCanvasRef = useRef(null);
+  const [canvasData, setCanvasData] = useState(null);
   
   // Form State
   const [formData, setFormData] = useState({
@@ -41,7 +47,7 @@ export default function BookingManagement() {
     const preSelectedPackage = params.get("package");
 
     fetchData(preSelectedPackage);
-  }, [navigate, location.search]);
+  }, [navigate, location.search]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch Bookings and Packages
   const fetchData = async (preSelectedPackageId) => {
@@ -77,7 +83,6 @@ export default function BookingManagement() {
 
     } catch (err) {
       console.error("Error fetching data:", err);
-      setError("Failed to load booking data.");
     } finally {
       setLoading(false);
     }
@@ -93,6 +98,8 @@ export default function BookingManagement() {
   // Open Modal for Creating
   const openCreateModal = () => {
     resetForm();
+    setAllowCustomize(false);
+    setCanvasData(null);
     setModalMode("create");
     setShowModal(true);
   };
@@ -134,10 +141,83 @@ export default function BookingManagement() {
     });
   };
 
+  // Initialize Fabric canvas when modal opens with package selected
+  useEffect(() => {
+    if (showModal && selectedPackage && canvasRef.current && !fabricCanvasRef.current) {
+      const container = canvasRef.current.parentElement;
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+      
+      const canvas = new window.fabric.Canvas(canvasRef.current, {
+        width: containerWidth,
+        height: containerHeight,
+        backgroundColor: '#1f2937',
+        uniformScaling: true,
+        selection: true,
+      });
+      fabricCanvasRef.current = canvas;
+
+      // Load package's default layout if it exists
+      if (selectedPackage.package_layout) {
+        try {
+          const layoutData = typeof selectedPackage.package_layout === 'string' 
+            ? JSON.parse(selectedPackage.package_layout) 
+            : selectedPackage.package_layout;
+          canvas.loadFromJSON(layoutData, () => {
+            canvas.renderAll();
+            // Set all objects to be fully interactive, will be controlled by the toggle effect
+            canvas.getObjects().forEach(obj => {
+              obj.selectable = true;
+              obj.evented = true;
+              obj.hasControls = true;
+              obj.hasBorders = true;
+              obj.lockMovementX = false;
+              obj.lockMovementY = false;
+            });
+          });
+        } catch (e) {
+          console.error('Error loading layout:', e);
+        }
+      }
+
+      canvas.on('object:modified', () => {
+        if (allowCustomize) {
+          setCanvasData(canvas.toJSON());
+        }
+      });
+    }
+
+    // Cleanup when modal closes
+    if (!showModal && fabricCanvasRef.current) {
+      fabricCanvasRef.current.dispose();
+      fabricCanvasRef.current = null;
+    }
+  }, [showModal, selectedPackage]);
+
+  // Helper function to update canvas customization state
+  const updateCanvasCustomization = (canvas, isCustomizable) => {
+    canvas.selection = isCustomizable;
+    canvas.getObjects().forEach(obj => {
+      obj.selectable = isCustomizable;
+      obj.evented = isCustomizable;
+      obj.hasControls = isCustomizable;
+      obj.hasBorders = isCustomizable;
+      obj.lockMovementX = !isCustomizable;
+      obj.lockMovementY = !isCustomizable;
+    });
+    canvas.renderAll();
+  };
+
+  // Separate effect to handle allowCustomize toggle
+  useEffect(() => {
+    if (fabricCanvasRef.current) {
+      updateCanvasCustomization(fabricCanvasRef.current, allowCustomize);
+    }
+  }, [allowCustomize]);
+
   // Handle Form Submit (Create or Edit)
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
     
     const user = JSON.parse(sessionStorage.getItem("user"));
     const userId = user.id || user.Account_ID;
@@ -150,7 +230,12 @@ export default function BookingManagement() {
       if (modalMode === "create") {
         url = "http://localhost:3001/api/bookings/create";
         method = "POST";
-        body = { ...formData, client_id: userId };
+        body = { 
+          ...formData, 
+          customer_id: userId,
+          custom_layout: allowCustomize && canvasData ? JSON.stringify(canvasData) : null,
+          has_custom_layout: allowCustomize && canvasData ? 1 : 0
+        };
       } else {
         url = `http://localhost:3001/api/bookings/update/${formData.booking_id}`;
         method = "PUT";
@@ -167,6 +252,11 @@ export default function BookingManagement() {
 
       if (data.status === "success") {
         setShowModal(false);
+        setAllowCustomize(false);
+        if (fabricCanvasRef.current) {
+          fabricCanvasRef.current.dispose();
+          fabricCanvasRef.current = null;
+        }
         // Refresh list
         const bookRes = await fetch(`http://localhost:3001/api/bookings/my-bookings/${userId}`);
         const bookData = await bookRes.json();
@@ -207,15 +297,6 @@ export default function BookingManagement() {
       console.error("Cancel error:", err);
       alert("Could not connect to server to cancel booking.");
     }
-  };
-
-  // Format Date for Display
-  const formatDate = (dateString) => {
-    if (!dateString) return "TBD";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", { 
-      year: 'numeric', month: 'long', day: 'numeric' 
-    });
   };
 
   // Helper for status colors
@@ -331,7 +412,15 @@ export default function BookingManagement() {
       {/* Modal */}
       {showModal && (
         <div className="bm-modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="bm-modal-content" onClick={e => e.stopPropagation()}>
+          <div 
+            className="bm-modal-content" 
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: selectedPackage ? '900px' : '600px',
+              maxHeight: '90vh',
+              overflowY: 'auto'
+            }}
+          >
             <div className="bm-modal-header">
               <h2>{modalMode === 'create' ? 'Book an Event' : 'Update Booking'}</h2>
               <button className="bm-close-btn" onClick={() => setShowModal(false)}>×</button>
@@ -343,7 +432,17 @@ export default function BookingManagement() {
                 <label>Select Package</label>
                 <select 
                   value={formData.package_id}
-                  onChange={e => setFormData({...formData, package_id: e.target.value})}
+                  onChange={e => {
+                    const pkgId = e.target.value;
+                    setFormData({...formData, package_id: pkgId});
+                    const pkg = packages.find(p => p.Package_ID === parseInt(pkgId));
+                    setSelectedPackage(pkg || null);
+                    // Reset canvas when package changes
+                    if (fabricCanvasRef.current) {
+                      fabricCanvasRef.current.dispose();
+                      fabricCanvasRef.current = null;
+                    }
+                  }}
                   required
                   disabled={modalMode === 'edit'} // Lock package when editing logistics
                 >
@@ -418,6 +517,64 @@ export default function BookingManagement() {
                   onChange={e => setFormData({...formData, notes: e.target.value})}
                 />
               </div>
+
+              {/* Canvas Layout Preview - Show when package is selected */}
+              {modalMode === 'create' && selectedPackage && (
+                <div className="bm-canvas-section" style={{display: 'flex', flexDirection: 'column', minHeight: '600px'}}>
+                  <h3 style={{marginBottom: '10px'}}>Event Layout Preview</h3>
+                  <div style={{flex: 1, border: '3px solid #d1d5db', borderRadius: '10px', position: 'relative', overflow: 'hidden', display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start'}}>
+                        <canvas ref={canvasRef} style={{display: 'block'}} />
+                        {/* Message overlay when not customizing */}
+                        {!allowCustomize && (
+                          <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: 'rgba(45, 55, 72, 0.85)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            pointerEvents: 'none',
+                            borderRadius: '8px',
+                            color: 'white',
+                            fontSize: '16px',
+                            fontWeight: '500',
+                            textAlign: 'center',
+                            padding: '20px',
+                            backdropFilter: 'blur(3px)'
+                          }}>
+                            <div>
+                              <div style={{fontSize: '40px', marginBottom: '12px'}}>🔒</div>
+                              <div>Check the box below to customize this layout</div>
+                              <div style={{fontSize: '12px', marginTop: '8px', opacity: '0.8'}}>
+                                You can move and rearrange items when customization is enabled
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                    </div>
+
+                  {/* Customization Checkbox */}
+                  <div className="bm-form-group" style={{marginTop: '10px'}}>
+                    <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
+                      <input 
+                        type="checkbox"
+                        checked={allowCustomize}
+                        onChange={e => setAllowCustomize(e.target.checked)}
+                        style={{cursor: 'pointer'}}
+                      />
+                      Allow me to customize the layout
+                    </label>
+                    <p style={{marginTop: '5px', fontSize: '12px', color: '#718096'}}>
+                      {allowCustomize 
+                        ? 'You can now drag and reposition items on the canvas.' 
+                        : 'Check the box above to customize the layout by moving items.'}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="bm-form-actions">
                 <button type="button" className="bm-btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>

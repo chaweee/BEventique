@@ -6,8 +6,11 @@ export default function BookingPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const canvasRef = useRef(null);
+  const mapRef = useRef(null);
   const [fabricCanvas, setFabricCanvas] = useState(null);
   const packageData = location.state?.package;
+  const [mapInstance, setMapInstance] = useState(null);
+  const [markerInstance, setMarkerInstance] = useState(null);
 
   // Form state
   const [bookingForm, setBookingForm] = useState({
@@ -27,72 +30,153 @@ export default function BookingPage() {
     return user.id || user.Account_ID || localStorage.getItem("userId");
   };
 
-  // Initialize canvas
+  // Redirect if no package data
   useEffect(() => {
     if (!packageData) {
       navigate("/customer-packages");
-      return;
     }
+  }, [packageData, navigate]);
 
-    // Load Fabric.js from CDN
-    const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js";
-    script.async = true;
-    script.onload = () => {
-      initializeCanvas();
-    };
-    document.body.appendChild(script);
+  // Load Fabric.js from CDN
+  useEffect(() => {
+    if (!window.fabric) {
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
 
-    return () => {
-      if (fabricCanvas) {
-        fabricCanvas.dispose();
+  // Load Google Maps API
+  useEffect(() => {
+    if (window.google && window.google.maps) return;
+    
+    window.initMap = () => {
+      if (mapRef.current && !mapInstance) {
+        const defaultCenter = { lat: 12.8797, lng: 121.7740 };
+        
+        const map = new window.google.maps.Map(mapRef.current, {
+          zoom: 10,
+          center: defaultCenter,
+          mapTypeControl: false,
+          fullscreenControl: false,
+          streetViewControl: false
+        });
+        setMapInstance(map);
+        
+        const marker = new window.google.maps.Marker({
+          position: defaultCenter,
+          map: map,
+          title: "Event Location"
+        });
+        setMarkerInstance(marker);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [packageData]);
+    
+    const script = document.createElement("script");
+    script.src = "https://maps.googleapis.com/maps/api/js?key=AIzaSyDKwU_Wdkzs8bBzS36dGdwdqLqDxYGzMhk&libraries=places&callback=initMap";
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+  }, []);
 
-  // Initialize Fabric canvas
-  const initializeCanvas = () => {
-    if (!canvasRef.current || !window.fabric) return;
+  // Handle location change and update map
+  useEffect(() => {
+    if (!bookingForm.location || !mapRef.current || !window.google) return;
+
+    const geocoder = new window.google.maps.Geocoder();
+    
+    geocoder.geocode({ address: bookingForm.location }, (results, status) => {
+      if (status === window.google.maps.GeocoderStatus.OK && results[0]) {
+        const { lat, lng } = results[0].geometry.location;
+        
+        // Initialize or update map
+        if (!mapInstance) {
+          const map = new window.google.maps.Map(mapRef.current, {
+            zoom: 15,
+            center: { lat: lat(), lng: lng() },
+            mapTypeControl: false,
+            fullscreenControl: false
+          });
+          setMapInstance(map);
+          
+          // Add marker
+          const marker = new window.google.maps.Marker({
+            position: { lat: lat(), lng: lng() },
+            map: map,
+            title: bookingForm.location
+          });
+          setMarkerInstance(marker);
+        } else {
+          // Update existing map and marker
+          mapInstance.setCenter({ lat: lat(), lng: lng() });
+          markerInstance.setPosition({ lat: lat(), lng: lng() });
+          markerInstance.setTitle(bookingForm.location);
+        }
+      }
+    });
+  }, [bookingForm.location, mapInstance, markerInstance]);
+
+  // Initialize canvas
+  // Initialize canvas
+  useEffect(() => {
+    if (!canvasRef.current || !window.fabric || !packageData.package_layout) return;
+
+    const container = canvasRef.current.parentElement;
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
 
     const canvas = new window.fabric.Canvas(canvasRef.current, {
-      width: 600,
-      height: 600,
+      width: containerWidth,
+      height: containerHeight,
       backgroundColor: "#1f2937",
-      selection: false
+      selection: true,
+      uniformScaling: true
     });
 
     setFabricCanvas(canvas);
 
-    // Load package layout if exists
-    if (packageData.package_layout) {
-      try {
-        const layoutData = typeof packageData.package_layout === "string" 
-          ? JSON.parse(packageData.package_layout) 
-          : packageData.package_layout;
-        
-        canvas.loadFromJSON(layoutData, () => {
-          canvas.renderAll();
-          canvas.forEachObject((obj) => {
-            obj.selectable = false;
-            obj.evented = false;
-          });
+    // Load package layout
+    try {
+      const layoutData = typeof packageData.package_layout === "string" 
+        ? JSON.parse(packageData.package_layout) 
+        : packageData.package_layout;
+      
+      canvas.loadFromJSON(layoutData, () => {
+        canvas.renderAll();
+        // Load objects as fully interactive, will be controlled by the other effect
+        canvas.forEachObject((obj) => {
+          obj.selectable = true;
+          obj.evented = true;
+          obj.hasControls = true;
+          obj.hasBorders = true;
+          obj.lockMovementX = false;
+          obj.lockMovementY = false;
         });
-      } catch (err) {
-        console.error("Error loading canvas layout:", err);
-      }
+        canvas.renderAll();
+      });
+    } catch (err) {
+      console.error("Error loading canvas layout:", err);
     }
-  };
 
-  // Enable/disable customization
+    return () => {
+      canvas.dispose();
+    };
+  }, [packageData.package_layout]);
+
+  // Update canvas when customization changes
   useEffect(() => {
     if (!fabricCanvas) return;
-
+    
+    fabricCanvas.selection = allowCustomization;
     fabricCanvas.forEachObject((obj) => {
       obj.selectable = allowCustomization;
       obj.evented = allowCustomization;
+      obj.hasControls = allowCustomization;
+      obj.hasBorders = allowCustomization;
+      obj.lockMovementX = !allowCustomization;
+      obj.lockMovementY = !allowCustomization;
     });
-    fabricCanvas.selection = allowCustomization;
     fabricCanvas.renderAll();
   }, [allowCustomization, fabricCanvas]);
 
@@ -325,9 +409,9 @@ export default function BookingPage() {
 
       {/* Main Content */}
       <main className="bp-main">
-        <div className="bp-container">
-          {/* Left: Canvas */}
-          <div className="bp-canvas-section">
+        <div className="bp-container" style={{maxWidth: '1600px', display: 'flex', gap: '0'}}>
+          {/* Left: Canvas - 62% width to match designer */}
+          <div className="bp-canvas-section" style={{flex: '0 0 62%', padding: '28px', backgroundColor: '#f9fafb', display: 'flex', flexDirection: 'column'}}>
             <div className="bp-section-header">
               <h2>Event Layout Preview</h2>
               <label className="bp-customize-checkbox">
@@ -340,66 +424,43 @@ export default function BookingPage() {
               </label>
             </div>
 
-            <div className="bp-canvas-container">
-              <canvas ref={canvasRef} id="bookingCanvas"></canvas>
-            </div>
-
-            {allowCustomization && (
-              <div className="bp-canvas-tools">
-                <div className="bp-tools-header">
-                  <h3>Add Items</h3>
-                  <div className="bp-tools-actions">
-                    <button className="bp-tool-btn delete" onClick={deleteSelected}>
-                      Delete Selected
-                    </button>
-                    <button className="bp-tool-btn clear" onClick={clearCanvas}>
-                      Clear All
-                    </button>
+            <div style={{flex: 1, border: '3px solid #d1d5db', borderRadius: '10px', position: 'relative', minHeight: '600px', overflow: 'hidden', display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start'}}>
+              <canvas ref={canvasRef} id="bookingCanvas" style={{display: 'block'}}></canvas>
+              {/* Message overlay when not customizing */}
+              {!allowCustomization && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(45, 55, 72, 0.85)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
+                  borderRadius: '8px',
+                  color: 'white',
+                  fontSize: '18px',
+                  fontWeight: '500',
+                  textAlign: 'center',
+                  padding: '20px',
+                  backdropFilter: 'blur(3px)'
+                }}>
+                  <div>
+                    <div style={{fontSize: '48px', marginBottom: '15px'}}>🔒</div>
+                    <div>Check the box above if you want to customize this layout</div>
+                    <div style={{fontSize: '14px', marginTop: '10px', opacity: '0.8'}}>
+                      You can move and rearrange items when customization is enabled
+                    </div>
                   </div>
                 </div>
-                <div className="bp-tools-grid">
-                  <button
-                    className={`bp-tool-item ${selectedTool === "table" ? "active" : ""}`}
-                    onClick={() => addObject("table")}
-                  >
-                    <div className="tool-icon">▢</div>
-                    <span>Table</span>
-                  </button>
-                  <button
-                    className={`bp-tool-item ${selectedTool === "round-table" ? "active" : ""}`}
-                    onClick={() => addObject("round-table")}
-                  >
-                    <div className="tool-icon">●</div>
-                    <span>Round Table</span>
-                  </button>
-                  <button
-                    className={`bp-tool-item ${selectedTool === "chair" ? "active" : ""}`}
-                    onClick={() => addObject("chair")}
-                  >
-                    <div className="tool-icon">□</div>
-                    <span>Chair</span>
-                  </button>
-                  <button
-                    className={`bp-tool-item ${selectedTool === "tent" ? "active" : ""}`}
-                    onClick={() => addObject("tent")}
-                  >
-                    <div className="tool-icon">△</div>
-                    <span>Tent</span>
-                  </button>
-                  <button
-                    className={`bp-tool-item ${selectedTool === "platform" ? "active" : ""}`}
-                    onClick={() => addObject("platform")}
-                  >
-                    <div className="tool-icon">▭</div>
-                    <span>Platform</span>
-                  </button>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          {/* Right: Booking Form */}
-          <div className="bp-form-section">
+          {/* Right: Booking Form - 38% width to match designer */}
+          <div className="bp-form-section" style={{flex: '0 0 38%', padding: '28px', overflowY: 'auto'}}>
             <div className="bp-package-info">
               <h2>{packageData.Package_Name}</h2>
               <div className="bp-package-price">₱{packageData.Package_Amount?.toLocaleString()}</div>
@@ -447,6 +508,16 @@ export default function BookingPage() {
                   placeholder="Enter event venue/location"
                   required
                 />
+                <div style={{marginTop: '15px', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.15)'}}>
+                  <div 
+                    ref={mapRef} 
+                    style={{
+                      width: '100%',
+                      height: '300px',
+                      backgroundColor: '#e5e3df'
+                    }}
+                  />
+                </div>
               </div>
 
               <div className="bp-form-row">

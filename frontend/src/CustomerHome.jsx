@@ -43,7 +43,7 @@ export default function CustomerHome() {
             <h1>Welcome back</h1>
             <p>Browse themes, preview layouts, and start booking your dream event.</p>
             <div className="ch-hero-actions">
-              <button className="ch-cta" onClick={() => navigate("/themes")}>Browse Themes</button>
+              <button className="ch-cta" onClick={() => navigate("/customer-packages")}>Browse Packages</button>
               <button className="ch-cta ghost" onClick={() => navigate("/bookings")}>My Bookings</button>
             </div>
           </div>
@@ -57,8 +57,8 @@ export default function CustomerHome() {
               <h3>Princess Birthday Theme</h3>
               <p>Blush roses, tulle drapes, fairy lights — dreamy setup.</p>
               <div className="ch-card-actions">
-                <button onClick={() => navigate("/layout/1")} className="ch-btn">View Details</button>
-                <button onClick={() => navigate("/bookings/new?layout=1")} className="ch-btn ghost">Book</button>
+                <button onClick={() => navigate("/customer-packages")} className="ch-btn">View Packages</button>
+                <button onClick={() => navigate("/bookings")} className="ch-btn ghost">Book</button>
               </div>
             </article>
 
@@ -67,8 +67,8 @@ export default function CustomerHome() {
               <h3>Rustic Garden Wedding</h3>
               <p>Natural timber accents and wildflowers for an intimate day.</p>
               <div className="ch-card-actions">
-                <button onClick={() => navigate("/layout/2")} className="ch-btn">View Details</button>
-                <button onClick={() => navigate("/bookings/new?layout=2")} className="ch-btn ghost">Book</button>
+                <button onClick={() => navigate("/customer-packages")} className="ch-btn">View Packages</button>
+                <button onClick={() => navigate("/bookings")} className="ch-btn ghost">Book</button>
               </div>
             </article>
 
@@ -77,8 +77,8 @@ export default function CustomerHome() {
               <h3>Elegant Tea Party</h3>
               <p>Ivory and rose palette with delicate china and florals.</p>
               <div className="ch-card-actions">
-                <button onClick={() => navigate("/layout/3")} className="ch-btn">View Details</button>
-                <button onClick={() => navigate("/bookings/new?layout=3")} className="ch-btn ghost">Book</button>
+                <button onClick={() => navigate("/customer-packages")} className="ch-btn">View Packages</button>
+                <button onClick={() => navigate("/bookings")} className="ch-btn ghost">Book</button>
               </div>
             </article>
           </div>
