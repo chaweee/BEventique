@@ -5,12 +5,9 @@ import "./BookingPage.css";
 export default function BookingPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const canvasRef = useRef(null);
-  const mapRef = useRef(null);
+  const canvasContainerRef = useRef(null);
   const [fabricCanvas, setFabricCanvas] = useState(null);
   const packageData = location.state?.package;
-  const [mapInstance, setMapInstance] = useState(null);
-  const [markerInstance, setMarkerInstance] = useState(null);
 
   // Form state
   const [bookingForm, setBookingForm] = useState({
@@ -22,7 +19,13 @@ export default function BookingPage() {
 
   // Canvas customization state
   const [allowCustomization, setAllowCustomization] = useState(false);
-  const [selectedTool, setSelectedTool] = useState(null);
+
+  // Booking preview state
+  const [bookingPreview, setBookingPreview] = useState(null);
+  const [bookingReceipt, setBookingReceipt] = useState(null);
+  const previewCanvasRef = useRef(null);
+  const previewFabricRef = useRef(null);
+  const receiptRef = useRef(null);
 
   // Get user info
   const getCustomerId = () => {
@@ -45,126 +48,122 @@ export default function BookingPage() {
       script.async = true;
       document.body.appendChild(script);
     }
+    // load html2canvas for converting receipt HTML to image
+    if (!window.html2canvas) {
+      const s2 = document.createElement('script');
+      s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s2.async = true;
+      document.body.appendChild(s2);
+    }
   }, []);
-
-  // Load Google Maps API
-  useEffect(() => {
-    if (window.google && window.google.maps) return;
-    
-    window.initMap = () => {
-      if (mapRef.current && !mapInstance) {
-        const defaultCenter = { lat: 12.8797, lng: 121.7740 };
-        
-        const map = new window.google.maps.Map(mapRef.current, {
-          zoom: 10,
-          center: defaultCenter,
-          mapTypeControl: false,
-          fullscreenControl: false,
-          streetViewControl: false
-        });
-        setMapInstance(map);
-        
-        const marker = new window.google.maps.Marker({
-          position: defaultCenter,
-          map: map,
-          title: "Event Location"
-        });
-        setMarkerInstance(marker);
-      }
-    };
-    
-    const script = document.createElement("script");
-    script.src = "https://maps.googleapis.com/maps/api/js?key=AIzaSyDKwU_Wdkzs8bBzS36dGdwdqLqDxYGzMhk&libraries=places&callback=initMap";
-    script.async = true;
-    script.defer = true;
-    document.body.appendChild(script);
-  }, []);
-
-  // Handle location change and update map
-  useEffect(() => {
-    if (!bookingForm.location || !mapRef.current || !window.google) return;
-
-    const geocoder = new window.google.maps.Geocoder();
-    
-    geocoder.geocode({ address: bookingForm.location }, (results, status) => {
-      if (status === window.google.maps.GeocoderStatus.OK && results[0]) {
-        const { lat, lng } = results[0].geometry.location;
-        
-        // Initialize or update map
-        if (!mapInstance) {
-          const map = new window.google.maps.Map(mapRef.current, {
-            zoom: 15,
-            center: { lat: lat(), lng: lng() },
-            mapTypeControl: false,
-            fullscreenControl: false
-          });
-          setMapInstance(map);
-          
-          // Add marker
-          const marker = new window.google.maps.Marker({
-            position: { lat: lat(), lng: lng() },
-            map: map,
-            title: bookingForm.location
-          });
-          setMarkerInstance(marker);
-        } else {
-          // Update existing map and marker
-          mapInstance.setCenter({ lat: lat(), lng: lng() });
-          markerInstance.setPosition({ lat: lat(), lng: lng() });
-          markerInstance.setTitle(bookingForm.location);
-        }
-      }
-    });
-  }, [bookingForm.location, mapInstance, markerInstance]);
 
   // Initialize canvas
   // Initialize canvas
   useEffect(() => {
-    if (!canvasRef.current || !window.fabric || !packageData.package_layout) return;
+    if (!canvasContainerRef.current || !window.fabric || !packageData || !packageData.package_layout) return;
 
-    const container = canvasRef.current.parentElement;
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
+    let isMounted = true;
+    let canvasInstance = null;
+    let canvasEl = null;
+    
+    const container = canvasContainerRef.current;
+    if (!container) return;
+    
+    // Prefer the user's customized canvas size when available
+    const sourceCanvas = fabricCanvas || null;
+    const sourceWidth = sourceCanvas && typeof sourceCanvas.getWidth === 'function' ? sourceCanvas.getWidth() : container.clientWidth;
+    const sourceHeight = sourceCanvas && typeof sourceCanvas.getHeight === 'function' ? sourceCanvas.getHeight() : container.clientHeight;
+    const containerWidth = sourceWidth;
+    const containerHeight = sourceHeight;
 
-    const canvas = new window.fabric.Canvas(canvasRef.current, {
-      width: containerWidth,
-      height: containerHeight,
-      backgroundColor: "#1f2937",
-      selection: true,
-      uniformScaling: true
-    });
-
-    setFabricCanvas(canvas);
-
-    // Load package layout
     try {
-      const layoutData = typeof packageData.package_layout === "string" 
-        ? JSON.parse(packageData.package_layout) 
-        : packageData.package_layout;
-      
-      canvas.loadFromJSON(layoutData, () => {
-        canvas.renderAll();
-        // Load objects as fully interactive, will be controlled by the other effect
-        canvas.forEachObject((obj) => {
-          obj.selectable = true;
-          obj.evented = true;
-          obj.hasControls = true;
-          obj.hasBorders = true;
-          obj.lockMovementX = false;
-          obj.lockMovementY = false;
-        });
-        canvas.renderAll();
+      // create a wrapper div (absolute) appended to the container so it stays aligned
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'absolute';
+      // position it relative inside the container
+      wrapper.style.left = '0px';
+      wrapper.style.top = '0px';
+      wrapper.style.width = '100%';
+      wrapper.style.height = '100%';
+      wrapper.style.overflow = 'hidden';
+      wrapper.style.pointerEvents = 'none';
+      wrapper.style.zIndex = '1000';
+      // ensure container is positioned so absolute child aligns correctly
+      try { container.style.position = container.style.position || 'relative'; } catch (e) {}
+      container.appendChild(wrapper);
+
+      canvasEl = document.createElement('canvas');
+      canvasEl.id = 'bookingCanvas_internal';
+      canvasEl.style.display = 'block';
+      canvasEl.width = containerWidth;
+      canvasEl.height = containerHeight;
+      // canvas inside wrapper so it gets clipped by container area
+      wrapper.appendChild(canvasEl);
+
+      canvasInstance = new window.fabric.Canvas(canvasEl, {
+        width: containerWidth,
+        height: containerHeight,
+        backgroundColor: "#1f2937",
+        selection: true,
+        uniformScaling: true
       });
+
+      // allow targeting sub-objects inside groups and more precise hit-testing
+      canvasInstance.subTargetCheck = true;
+      canvasInstance.perPixelTargetFind = true;
+
+      if (isMounted) {
+        console.log('[canvas] init BookingPage', { time: Date.now(), width: containerWidth, height: containerHeight });
+        // attach element and wrapper for cleanup & syncing
+        canvasInstance.__canvasEl = canvasEl;
+        canvasInstance.__wrapperEl = wrapper;
+
+        // wrapper is appended to container so it stays aligned; no global sync required
+        canvasInstance.__syncPosition = null;
+        setFabricCanvas(canvasInstance);
+
+        // Load package layout
+        const layoutData = typeof packageData.package_layout === "string" 
+          ? JSON.parse(packageData.package_layout) 
+          : packageData.package_layout;
+        
+        canvasInstance.loadFromJSON(layoutData, () => {
+          if (!isMounted) return;
+          canvasInstance.renderAll();
+          // Load objects as fully interactive, will be controlled by the other effect
+          canvasInstance.forEachObject((obj) => {
+            obj.selectable = true;
+            obj.evented = true;
+            obj.hasControls = true;
+            obj.hasBorders = true;
+            obj.lockMovementX = false;
+            obj.lockMovementY = false;
+          });
+          canvasInstance.renderAll();
+        });
+      }
     } catch (err) {
-      console.error("Error loading canvas layout:", err);
+      console.error("Error initializing canvas:", err);
     }
 
-    return () => {
-      canvas.dispose();
-    };
-  }, [packageData.package_layout]);
-
-  // Update canvas when customization changes
+  return () => {
+    isMounted = false;
+    console.log('[canvas] cleanup BookingPage', { time: Date.now() });
+      if (canvasInstance) {
+      try {
+        const wrapperEl = canvasInstance.__wrapperEl;
+        const ce = canvasInstance.__canvasEl;
+        canvasInstance.dispose();
+        if (ce && ce.parentNode) ce.parentNode.removeChild(ce);
+        if (wrapperEl && wrapperEl.parentNode) wrapperEl.parentNode.removeChild(wrapperEl);
+      } catch (err) {
+        console.warn('Error disposing canvas (BookingPage):', err?.message || err);
+      }
+      canvasInstance = null;
+    }
+    setFabricCanvas(null);
+  };
+}, [packageData?.package_layout, packageData]);  // Update canvas when customization changes
   useEffect(() => {
     if (!fabricCanvas) return;
     
@@ -178,6 +177,165 @@ export default function BookingPage() {
       obj.lockMovementY = !allowCustomization;
     });
     fabricCanvas.renderAll();
+  }, [allowCustomization, fabricCanvas]);
+
+  // Create preview canvas when bookingPreview is active
+  useEffect(() => {
+    if (!bookingPreview || !bookingReceipt || !previewCanvasRef.current || !window.fabric) return;
+
+    // create a wrapper and canvas inside the preview container so it aligns reliably
+    const container = previewCanvasRef.current;
+    const sourceWidth = container.clientWidth;
+    const sourceHeight = container.clientHeight;
+    const wrapper = document.createElement('div');
+    wrapper.style.position = 'absolute';
+    // center the wrapper inside the preview box and allow scaling
+    wrapper.style.left = '50%';
+    wrapper.style.top = '50%';
+    wrapper.style.overflow = 'hidden';
+    wrapper.style.pointerEvents = 'auto';
+    wrapper.style.zIndex = '1000';
+    try { container.style.position = container.style.position || 'relative'; } catch (e) {}
+    container.appendChild(wrapper);
+
+    // If the live editor canvas exists, copy its rendered image to the preview
+    let createdImg = null;
+    let canvas = null;
+    if (fabricCanvas && typeof fabricCanvas.toDataURL === 'function') {
+      try {
+        const layoutW = typeof fabricCanvas.getWidth === 'function' ? fabricCanvas.getWidth() : sourceWidth;
+        const layoutH = typeof fabricCanvas.getHeight === 'function' ? fabricCanvas.getHeight() : sourceHeight;
+        const dataUrl = fabricCanvas.toDataURL({ format: 'png' });
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.style.display = 'block';
+        img.width = layoutW;
+        img.height = layoutH;
+        wrapper.appendChild(img);
+        createdImg = img;
+        // store pointers for cleanup consistent with fabric objects
+        previewFabricRef.current = { __wrapperEl: wrapper, __canvasEl: img, __isImage: true, __width: layoutW, __height: layoutH };
+      } catch (err) {
+        console.warn('Error creating image preview from live canvas:', err);
+      }
+    }
+
+    // If we didn't create an image (no live editor available), create a StaticCanvas and load JSON
+    if (!createdImg) {
+      const canvasEl = document.createElement('canvas');
+      canvasEl.style.display = 'block';
+      wrapper.appendChild(canvasEl);
+
+      canvas = new window.fabric.StaticCanvas(canvasEl, {
+        width: sourceWidth,
+        height: sourceHeight,
+        backgroundColor: '#1f2937'
+      });
+      // enable sub-target and better hit testing
+      canvas.subTargetCheck = true;
+      canvas.perPixelTargetFind = true;
+      previewFabricRef.current = canvas;
+
+      // load layout from bookingReceipt.custom_layout (may be string)
+      try {
+        const layoutData = bookingReceipt.custom_layout
+          ? (typeof bookingReceipt.custom_layout === 'string' ? JSON.parse(bookingReceipt.custom_layout) : bookingReceipt.custom_layout)
+          : null;
+        if (layoutData) {
+          canvas.loadFromJSON(layoutData, () => {
+            canvas.renderAll();
+          });
+        }
+      } catch (err) {
+        console.error('Error loading preview layout:', err);
+      }
+
+      // wrapper is child of container so it stays aligned; no global sync needed
+      canvas.__wrapperEl = wrapper;
+      canvas.__canvasEl = canvasEl;
+      canvas.__syncPosition = null;
+    }
+
+    // If we have a saved custom layout with dimensions, size the canvas accordingly
+    try {
+      // try to read width/height from the serialized layout if available
+      const layoutData = bookingReceipt.custom_layout
+        ? (typeof bookingReceipt.custom_layout === 'string' ? JSON.parse(bookingReceipt.custom_layout) : bookingReceipt.custom_layout)
+        : null;
+      let layoutW = null;
+      let layoutH = null;
+      if (layoutData && layoutData.width && layoutData.height) {
+        layoutW = layoutData.width;
+        layoutH = layoutData.height;
+      }
+      // fallback to actual fabric canvas (if user just customized in this session)
+      if ((!layoutW || !layoutH) && fabricCanvas) {
+        if (typeof fabricCanvas.getWidth === 'function') layoutW = fabricCanvas.getWidth();
+        if (typeof fabricCanvas.getHeight === 'function') layoutH = fabricCanvas.getHeight();
+      }
+      // Final fallback to preview container size
+      if (!layoutW) layoutW = sourceWidth;
+      if (!layoutH) layoutH = sourceHeight;
+
+      // set canvas element pixel size and fabric size (only if we created a canvas, not img)
+      if (canvas) {
+        const canvasEl = canvas.__canvasEl;
+        if (canvasEl) {
+          canvasEl.width = layoutW;
+          canvasEl.height = layoutH;
+        }
+        canvas.setWidth(layoutW);
+        canvas.setHeight(layoutH);
+      }
+
+      // set wrapper to source (full) size then scale it to match the editor box
+      wrapper.style.width = layoutW + 'px';
+      wrapper.style.height = layoutH + 'px';
+
+      // compute scale so the preview visually matches the editing canvas area
+      const editor = canvasContainerRef.current;
+      const targetW = editor ? editor.clientWidth : sourceWidth;
+      const targetH = editor ? editor.clientHeight : sourceHeight;
+      const scale = Math.min(1, targetW / layoutW, targetH / layoutH);
+      wrapper.style.transformOrigin = 'center center';
+      wrapper.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    } catch (err) {
+      console.warn('Error sizing preview canvas:', err);
+    }
+
+    // (redundant sizing removed)
+
+    return () => {
+      try {
+        const ref = previewFabricRef.current;
+        if (ref) {
+          // call dispose if available (fabric canvas), otherwise skip
+          if (typeof ref.dispose === 'function') {
+            try { ref.dispose(); } catch (e) {}
+          }
+          const w = ref.__wrapperEl;
+          const c = ref.__canvasEl;
+          if (c && c.parentNode) c.parentNode.removeChild(c);
+          if (w && w.parentNode) w.parentNode.removeChild(w);
+          previewFabricRef.current = null;
+        }
+      } catch (err) {
+        console.warn('Error cleaning preview canvas:', err);
+      }
+    };
+  }, [bookingPreview, bookingReceipt]);
+
+  // Ensure wrapper pointer-events follows allowCustomization state
+  useEffect(() => {
+    if (!fabricCanvas) return;
+    try {
+      const wrapper = fabricCanvas.__wrapperEl;
+      if (wrapper) {
+        wrapper.style.pointerEvents = allowCustomization ? 'auto' : 'none';
+      }
+    } catch (e) {
+      // ignore
+    }
   }, [allowCustomization, fabricCanvas]);
 
   // Add object to canvas
@@ -292,28 +450,27 @@ export default function BookingPage() {
     fabricCanvas.add(obj);
     fabricCanvas.setActiveObject(obj);
     fabricCanvas.renderAll();
-    setSelectedTool(null);
   };
 
-  // Delete selected object
-  const deleteSelected = () => {
-    if (!fabricCanvas || !allowCustomization) return;
-    const activeObject = fabricCanvas.getActiveObject();
-    if (activeObject) {
-      fabricCanvas.remove(activeObject);
-      fabricCanvas.renderAll();
-    }
-  };
+  // Delete selected object (reserved for future use)
+  // const deleteSelected = () => {
+  //   if (!fabricCanvas || !allowCustomization) return;
+  //   const activeObject = fabricCanvas.getActiveObject();
+  //   if (activeObject) {
+  //     fabricCanvas.remove(activeObject);
+  //     fabricCanvas.renderAll();
+  //   }
+  // };
 
-  // Clear canvas
-  const clearCanvas = () => {
-    if (!fabricCanvas || !allowCustomization) return;
-    if (window.confirm("Are you sure you want to clear all objects?")) {
-      fabricCanvas.clear();
-      fabricCanvas.backgroundColor = "#1f2937";
-      fabricCanvas.renderAll();
-    }
-  };
+  // Clear canvas (reserved for future use)
+  // const clearCanvas = () => {
+  //   if (!fabricCanvas || !allowCustomization) return;
+  //   if (window.confirm("Are you sure you want to clear all objects?")) {
+  //     fabricCanvas.clear();
+  //     fabricCanvas.backgroundColor = "#1f2937";
+  //     fabricCanvas.renderAll();
+  //   }
+  // };
 
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -348,22 +505,44 @@ export default function BookingPage() {
         return;
       }
       
-      // Get canvas layout
-      let canvasLayout = null;
-      if (fabricCanvas && allowCustomization) {
-        canvasLayout = JSON.stringify(fabricCanvas.toJSON());
+      // Get canvas layout - always save it (whether customized or not)
+      let customLayout = null;
+      
+      if (fabricCanvas) {
+        try {
+          // Serialize the entire canvas state including the layout
+          // This captures both original and customized layouts
+          customLayout = JSON.stringify(fabricCanvas.toJSON());
+        } catch (err) {
+          console.error("Error serializing canvas layout:", err);
+          // If canvas serialization fails, try to get the original package layout
+          if (packageData.package_layout) {
+            customLayout = typeof packageData.package_layout === "string" 
+              ? packageData.package_layout 
+              : JSON.stringify(packageData.package_layout);
+          }
+        }
+      } else if (packageData.package_layout) {
+        // If canvas hasn't initialized, store the original package layout
+        customLayout = typeof packageData.package_layout === "string" 
+          ? packageData.package_layout 
+          : JSON.stringify(packageData.package_layout);
       }
 
       const bookingData = {
         customer_id: customerId,
         package_id: packageData.Package_ID || packageData.id,
-        location: bookingForm.location.trim(),
         event_date: bookingForm.event_date,
         event_time: bookingForm.event_time,
-        notes: bookingForm.special_requests,
-        custom_layout: canvasLayout
+        location: bookingForm.location.trim(),
+        custom_layout: customLayout, // Stores layout whether customized or original
+        base_price: packageData.Package_Price || packageData.price,
+        notes: bookingForm.special_requests || null
       };
 
+      console.log("=== BOOKING DEBUG ===");
+      console.log("Customer ID:", customerId);
+      console.log("sessionStorage user:", sessionStorage.getItem("user"));
       console.log("Sending booking data:", bookingData);
       console.log("packageData:", packageData);
 
@@ -377,10 +556,24 @@ export default function BookingPage() {
       });
 
       const result = await response.json();
+      console.log("Booking creation result:", result);
 
       if (result.status === "success") {
-        alert("Booking submitted successfully!");
-        navigate("/bookings");
+        // Show preview instead of immediate confirmation
+        setBookingReceipt({
+          booking_id: result.booking_id,
+          ...bookingData,
+          package_price: result.package_price || packageData.Package_Amount || packageData.Package_Price || packageData.price,
+          package_name: result.package_name || packageData.Package_Name || packageData.name,
+          package_description: result.package_description || packageData.Description || "",
+          package_inclusions: result.package_inclusions || "",
+          customer_name: result.customer_name || "Guest",
+          customer_email: result.customer_email || "",
+          customer_phone: result.customer_phone || "",
+          designer_id: packageData.Designer_ID || packageData.designer_id
+        });
+        console.log("Set booking receipt - customer_name:", result.customer_name, "phone:", result.customer_phone);
+        setBookingPreview(true);
       } else {
         alert("Error: " + (result.message || "Failed to submit booking"));
       }
@@ -391,8 +584,219 @@ export default function BookingPage() {
     }
   };
 
+  
+
+  // Download receipt as image (JPEG) using html2canvas
+  const handleDownloadReceiptImage = async () => {
+    if (!receiptRef.current) return;
+    if (!window.html2canvas) {
+      alert('html2canvas not loaded yet. Try again in a moment.');
+      return;
+    }
+    try {
+      const canvas = await window.html2canvas(receiptRef.current, { backgroundColor: '#ffffff', scale: 2 });
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const el = document.createElement('a');
+      el.href = URL.createObjectURL(blob);
+      el.download = `Eventique-Receipt-${bookingReceipt.booking_id}.jpg`;
+      document.body.appendChild(el);
+      el.click();
+      document.body.removeChild(el);
+    } catch (err) {
+      console.error('Error creating receipt image:', err);
+      alert('Failed to create receipt image');
+    }
+  };
+
+  // Download layout canvas as JPEG blob
+  const handleDownloadLayoutImage = async () => {
+    let dataUrl = null;
+    try {
+      if (fabricCanvas && typeof fabricCanvas.toDataURL === 'function') {
+        dataUrl = fabricCanvas.toDataURL({ format: 'jpeg', quality: 0.92 });
+      } else if (previewFabricRef.current) {
+        const ref = previewFabricRef.current;
+        const el = ref.__canvasEl || ref.__imgEl || ref.__canvasEl;
+        if (el && el.nodeName === 'CANVAS') {
+          dataUrl = el.toDataURL('image/jpeg', 0.92);
+        } else if (el && el.nodeName === 'IMG') {
+          // img.src may be dataURL already or a remote URL; fetch it
+          dataUrl = el.src;
+        }
+      }
+
+      if (!dataUrl) return alert('Canvas not ready');
+
+      // If dataUrl is a data: URL or regular URL, fetch and download as blob
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const el = document.createElement('a');
+      el.href = URL.createObjectURL(blob);
+      el.download = `Eventique-Layout-${bookingReceipt?.booking_id || 'snapshot'}.jpg`;
+      document.body.appendChild(el);
+      el.click();
+      document.body.removeChild(el);
+    } catch (err) {
+      console.error('Error exporting layout image:', err);
+      alert('Failed to export layout');
+    }
+  };
+
   if (!packageData) {
     return null;
+  }
+
+  // Show booking preview if booking was successful
+  if (bookingPreview && bookingReceipt) {
+    return (
+      <div className="bp-root">
+        <header className="bp-header">
+          <div className="bp-brand" onClick={() => navigate("/customer-home")}>
+            Eventique
+          </div>
+        </header>
+
+        <main className="bp-main">
+          <div className="bp-preview-container" style={{display: 'flex', gap: '24px', alignItems: 'flex-start', justifyContent: 'center'}}>
+            {/* Left: Receipt */}
+            <div className="bp-preview-card" style={{flex: '0 0 38%', padding: '24px'}}>
+              <div className="bp-preview-header">
+                <h1>✓ Booking Confirmed!</h1>
+                <p>Your booking has been successfully submitted.</p>
+              </div>
+              <div className="bp-preview-content" ref={receiptRef} style={{background:'#fff', padding:'32px', borderRadius: '8px', color: '#111', fontFamily: 'system-ui, -apple-system, sans-serif'}}>
+                {/* Booking Receipt ID at Top */}
+                <div style={{textAlign: 'center', marginBottom: '20px'}}>
+                  <p style={{margin: 0, fontSize: '14px', fontWeight: '600', color: '#6b7280'}}>Receipt ID: #{bookingReceipt.booking_id}</p>
+                </div>
+
+                {/* Professional Header */}
+                <div style={{textAlign: 'center', marginBottom: '24px', borderBottom: '2px solid #1f2937', paddingBottom: '16px'}}>
+                  <h2 style={{margin: '0 0 4px 0', fontSize: '28px', fontWeight: '700', color: '#1f2937'}}>EVENTIQUE</h2>
+                  <p style={{margin: 0, color: '#6b7280', fontSize: '14px'}}>Event Planning & Design Services</p>
+                </div>
+
+                {/* Customer Information */}
+                <div style={{marginBottom: '20px', padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px'}}>
+                  <h4 style={{margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#374151', textTransform: 'uppercase'}}>Customer Information</h4>
+                  <div style={{fontSize: '14px', lineHeight: '1.6'}}>
+                    <div style={{marginBottom: '4px'}}>
+                      <span style={{color: '#6b7280', fontWeight: '500'}}>Name:</span>{' '}
+                      <strong style={{color: '#111'}}>{bookingReceipt.customer_name}</strong>
+                      {bookingReceipt.customer_phone && (
+                        <span style={{color: '#6b7280', marginLeft: '24px', fontWeight: '500'}}>
+                          Phone #: <strong style={{color: '#111'}}>{bookingReceipt.customer_phone}</strong>
+                        </span>
+                      )}
+                    </div>
+                    {bookingReceipt.customer_email && (
+                      <div>
+                        <span style={{color: '#6b7280', fontWeight: '500'}}>Email:</span>{' '}
+                        <strong style={{color: '#111'}}>{bookingReceipt.customer_email}</strong>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Package Details */}
+                <div style={{marginBottom: '20px'}}>
+                  <h4 style={{margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600', color: '#374151', textTransform: 'uppercase'}}>Package Details</h4>
+                  <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #e5e7eb'}}>
+                    <span style={{color: '#6b7280', fontSize: '14px'}}>Package Name</span>
+                    <strong style={{color: '#111', fontSize: '14px'}}>{bookingReceipt.package_name}</strong>
+                  </div>
+                  {bookingReceipt.package_inclusions && (
+                    <div style={{padding: '8px 0', borderBottom: '1px solid #e5e7eb'}}>
+                      <span style={{color: '#6b7280', fontSize: '14px', display: 'block', marginBottom: '4px'}}>Package Inclusions</span>
+                      <strong style={{color: '#111', fontSize: '14px'}}>{bookingReceipt.package_inclusions}</strong>
+                    </div>
+                  )}
+                  {bookingReceipt.package_description && (
+                    <div style={{padding: '8px 0', borderBottom: '1px solid #e5e7eb'}}>
+                      <span style={{color: '#6b7280', fontSize: '14px', display: 'block', marginBottom: '4px'}}>Package Description</span>
+                      <p style={{margin: 0, color: '#111', fontSize: '13px', lineHeight: '1.5'}}>{bookingReceipt.package_description}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Event Details */}
+                <div style={{marginBottom: '20px'}}>
+                  <h4 style={{margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600', color: '#374151', textTransform: 'uppercase'}}>Event Details</h4>
+                  <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #e5e7eb'}}>
+                    <span style={{color: '#6b7280', fontSize: '14px'}}>Location</span>
+                    <strong style={{color: '#111', fontSize: '14px', textAlign: 'right', maxWidth: '60%'}}>{bookingReceipt.location}</strong>
+                  </div>
+                  <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #e5e7eb'}}>
+                    <span style={{color: '#6b7280', fontSize: '14px'}}>Date</span>
+                    <strong style={{color: '#111', fontSize: '14px'}}>{new Date(bookingReceipt.event_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</strong>
+                  </div>
+                  <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #e5e7eb'}}>
+                    <span style={{color: '#6b7280', fontSize: '14px'}}>Time</span>
+                    <strong style={{color: '#111', fontSize: '14px'}}>{bookingReceipt.event_time}</strong>
+                  </div>
+                </div>
+
+                {/* Special Requests */}
+                {bookingReceipt.notes && (
+                  <div style={{marginBottom: '20px', padding: '12px', backgroundColor: '#fef3c7', borderRadius: '6px', borderLeft: '4px solid #f59e0b'}}>
+                    <h4 style={{margin: '0 0 6px 0', fontSize: '13px', fontWeight: '600', color: '#92400e'}}>Special Requests</h4>
+                    <p style={{margin: 0, fontSize: '13px', color: '#78350f', lineHeight: '1.5'}}>{bookingReceipt.notes}</p>
+                  </div>
+                )}
+
+                {/* Total Amount */}
+                <div style={{marginTop: '24px', padding: '16px', backgroundColor: '#1f2937', borderRadius: '6px'}}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                    <span style={{color: '#f9fafb', fontSize: '16px', fontWeight: '600'}}>TOTAL AMOUNT</span>
+                    <strong style={{color: '#fff', fontSize: '24px', fontWeight: '700'}}>₱{bookingReceipt.package_price?.toLocaleString()}</strong>
+                  </div>
+                </div>
+
+                {/* Payment Instructions */}
+                <div style={{marginTop: '24px', padding: '16px', backgroundColor: '#dbeafe', borderRadius: '6px', borderLeft: '4px solid #3b82f6'}}>
+                  <h4 style={{margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#1e40af'}}>📋 IMPORTANT - Payment Instructions</h4>
+                  <p style={{margin: '0 0 6px 0', fontSize: '13px', color: '#1e3a8a', lineHeight: '1.6'}}>
+                    <strong>Walk-in Payment Required:</strong> Please visit our office to complete the payment for this booking.
+                  </p>
+                  <p style={{margin: 0, fontSize: '13px', color: '#1e3a8a', lineHeight: '1.6'}}>
+                    Your booking will be <strong>approved after payment verification</strong>. Thank you!
+                  </p>
+                </div>
+
+                {/* Footer */}
+                <div style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e5e7eb', textAlign: 'center'}}>
+                  <p style={{margin: '0', fontSize: '12px', color: '#9ca3af', lineHeight: '1.5'}}>
+                    Thank you for choosing Eventique!<br/>
+                    For inquiries, please contact us or visit your bookings page.
+                  </p>
+                </div>
+              </div>
+
+              <div style={{display:'flex', gap:'8px', marginTop:'12px'}}>
+                <button className="bp-receipt-btn" onClick={handleDownloadReceiptImage}>🖼️ Download Receipt (JPEG)</button>
+              </div>
+
+              <div style={{marginTop:12}}>
+                <button className="bp-home-btn" onClick={() => navigate('/bookings')}>View My Bookings</button>
+              </div>
+            </div>
+
+            {/* Right: Final layout canvas */}
+            <div style={{flex: '0 0 62%', padding: '24px', backgroundColor: '#f9fafb', borderRadius: '8px'}}>
+              <h3 style={{fontSize: '24px', marginBottom: '16px', color: '#1f2937'}}>Final Layout</h3>
+              <div style={{height: '800px', position: 'relative', borderRadius: 8, overflow: 'hidden', backgroundColor: '#fff'}}>
+                <div ref={previewCanvasRef} style={{width: '100%', height: '100%'}} />
+              </div>
+              <div style={{display:'flex', gap:8, marginTop:16}}>
+                <button className="bp-receipt-btn" onClick={handleDownloadLayoutImage}>💾 Download Layout (JPEG)</button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   return (
@@ -425,7 +829,7 @@ export default function BookingPage() {
             </div>
 
             <div style={{flex: 1, border: '3px solid #d1d5db', borderRadius: '10px', position: 'relative', minHeight: '600px', overflow: 'hidden', display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start'}}>
-              <canvas ref={canvasRef} id="bookingCanvas" style={{display: 'block'}}></canvas>
+              <div ref={canvasContainerRef} style={{display: 'block', width: '100%', height: '100%'}} />
               {/* Message overlay when not customizing */}
               {!allowCustomization && (
                 <div style={{
@@ -438,7 +842,8 @@ export default function BookingPage() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  pointerEvents: 'none',
+                  pointerEvents: 'auto',
+                  zIndex: 1001,
                   borderRadius: '8px',
                   color: 'white',
                   fontSize: '18px',
@@ -508,16 +913,6 @@ export default function BookingPage() {
                   placeholder="Enter event venue/location"
                   required
                 />
-                <div style={{marginTop: '15px', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.15)'}}>
-                  <div 
-                    ref={mapRef} 
-                    style={{
-                      width: '100%',
-                      height: '300px',
-                      backgroundColor: '#e5e3df'
-                    }}
-                  />
-                </div>
               </div>
 
               <div className="bp-form-row">

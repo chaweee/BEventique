@@ -18,7 +18,7 @@ export default function BookingManagement() {
   
   // Canvas customization state
   const [allowCustomize, setAllowCustomize] = useState(false);
-  const canvasRef = useRef(null);
+  const canvasContainerRef = useRef(null);
   const fabricCanvasRef = useRef(null);
   const [canvasData, setCanvasData] = useState(null);
   
@@ -36,6 +36,8 @@ export default function BookingManagement() {
 
   // Check Login & Initial Fetch
   useEffect(() => {
+    let isMounted = true;
+    
     const user = sessionStorage.getItem("user");
     if (!user) {
       navigate("/login");
@@ -46,47 +48,54 @@ export default function BookingManagement() {
     const params = new URLSearchParams(location.search);
     const preSelectedPackage = params.get("package");
 
-    fetchData(preSelectedPackage);
-  }, [navigate, location.search]); // eslint-disable-line react-hooks/exhaustive-deps
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const parsedUser = JSON.parse(user);
+        const userId = parsedUser.id || parsedUser.Account_ID;
 
-  // Fetch Bookings and Packages
-  const fetchData = async (preSelectedPackageId) => {
-    try {
-      setLoading(true);
-      const user = JSON.parse(sessionStorage.getItem("user"));
-      const userId = user.id || user.Account_ID; // Handle different ID field names
+        // 1. Fetch Packages (for the dropdown)
+        const pkgRes = await fetch("http://localhost:3001/api/packages/list");
+        if (!pkgRes.ok) throw new Error("Failed to fetch packages");
+        const pkgData = await pkgRes.json();
+        const pkgList = Array.isArray(pkgData) ? pkgData : pkgData.packages || [];
+        
+        if (isMounted) setPackages(pkgList);
 
-      // 1. Fetch Packages (for the dropdown)
-      const pkgRes = await fetch("http://localhost:3001/api/packages/list");
-      const pkgData = await pkgRes.json();
-      const pkgList = Array.isArray(pkgData) ? pkgData : pkgData.packages || [];
-      setPackages(pkgList);
+        // 2. Fetch User's Bookings
+        const bookRes = await fetch(`http://localhost:3001/api/bookings/my-bookings/${userId}`);
+        if (!bookRes.ok) throw new Error("Failed to fetch bookings");
+        const bookData = await bookRes.json();
 
-      // 2. Fetch User's Bookings
-      const bookRes = await fetch(`http://localhost:3001/api/bookings/my-bookings/${userId}`);
-      const bookData = await bookRes.json();
+        if (isMounted) {
+          if (bookData.status === "success") {
+            setBookings(bookData.bookings);
+          } else {
+            setBookings([]);
+          }
+        }
 
-      if (bookData.status === "success") {
-        setBookings(bookData.bookings);
-      } else {
-        // If no bookings yet, just set empty
-        setBookings([]);
+        // 3. Open Modal if package was pre-selected
+        if (preSelectedPackage && isMounted) {
+          resetForm();
+          setFormData(prev => ({ ...prev, package_id: preSelectedPackage }));
+          setModalMode("create");
+          setShowModal(true);
+        }
+
+      } catch (err) {
+        console.error("Error fetching data:", err);
+      } finally {
+        if (isMounted) setLoading(false);
       }
+    };
 
-      // 3. Open Modal if package was pre-selected
-      if (preSelectedPackageId) {
-        resetForm();
-        setFormData(prev => ({ ...prev, package_id: preSelectedPackageId }));
-        setModalMode("create");
-        setShowModal(true);
-      }
-
-    } catch (err) {
-      console.error("Error fetching data:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    loadData();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate, location.search]);
 
   // Handle Logout
   const handleLogout = () => {
@@ -143,55 +152,116 @@ export default function BookingManagement() {
 
   // Initialize Fabric canvas when modal opens with package selected
   useEffect(() => {
-    if (showModal && selectedPackage && canvasRef.current && !fabricCanvasRef.current) {
-      const container = canvasRef.current.parentElement;
+    let isMounted = true;
+    
+    if (showModal && selectedPackage && canvasContainerRef.current && !fabricCanvasRef.current) {
+      const container = canvasContainerRef.current;
       const containerWidth = container.clientWidth;
       const containerHeight = container.clientHeight;
-      
-      const canvas = new window.fabric.Canvas(canvasRef.current, {
+
+      // Create a wrapper appended to body that clips the canvas and keeps it positioned
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'absolute';
+      const rect = container.getBoundingClientRect();
+      wrapper.style.left = rect.left + window.scrollX + 'px';
+      wrapper.style.top = rect.top + window.scrollY + 'px';
+      wrapper.style.width = containerWidth + 'px';
+      wrapper.style.height = containerHeight + 'px';
+      wrapper.style.overflow = 'hidden';
+      wrapper.style.pointerEvents = 'none';
+      wrapper.style.zIndex = '1000';
+      document.body.appendChild(wrapper);
+
+      const canvasEl = document.createElement('canvas');
+      canvasEl.style.display = 'block';
+      canvasEl.width = containerWidth;
+      canvasEl.height = containerHeight;
+      wrapper.appendChild(canvasEl);
+
+      const canvas = new window.fabric.Canvas(canvasEl, {
         width: containerWidth,
         height: containerHeight,
         backgroundColor: '#1f2937',
         uniformScaling: true,
         selection: true,
       });
-      fabricCanvasRef.current = canvas;
 
-      // Load package's default layout if it exists
-      if (selectedPackage.package_layout) {
-        try {
-          const layoutData = typeof selectedPackage.package_layout === 'string' 
-            ? JSON.parse(selectedPackage.package_layout) 
-            : selectedPackage.package_layout;
-          canvas.loadFromJSON(layoutData, () => {
-            canvas.renderAll();
-            // Set all objects to be fully interactive, will be controlled by the toggle effect
-            canvas.getObjects().forEach(obj => {
-              obj.selectable = true;
-              obj.evented = true;
-              obj.hasControls = true;
-              obj.hasBorders = true;
-              obj.lockMovementX = false;
-              obj.lockMovementY = false;
+      // allow targeting sub-objects inside groups and more precise hit-testing
+      canvas.subTargetCheck = true;
+      canvas.perPixelTargetFind = true;
+
+      if (isMounted) {
+        console.log('[canvas] init BookingManagement', { time: Date.now(), width: containerWidth, height: containerHeight });
+        // attach the created element and wrapper so we can remove them later
+        canvas.__canvasEl = canvasEl;
+        canvas.__wrapperEl = wrapper;
+        fabricCanvasRef.current = canvas;
+
+        // sync wrapper position with container on resize/scroll
+        const syncPosition = () => {
+          const r = container.getBoundingClientRect();
+          wrapper.style.left = r.left + window.scrollX + 'px';
+          wrapper.style.top = r.top + window.scrollY + 'px';
+          wrapper.style.width = r.width + 'px';
+          wrapper.style.height = r.height + 'px';
+        };
+        window.addEventListener('resize', syncPosition);
+        window.addEventListener('scroll', syncPosition);
+        canvas.__syncPosition = syncPosition;
+
+        // Load package's default layout if it exists
+        if (selectedPackage.package_layout) {
+          try {
+            const layoutData = typeof selectedPackage.package_layout === 'string' 
+              ? JSON.parse(selectedPackage.package_layout) 
+              : selectedPackage.package_layout;
+            canvas.loadFromJSON(layoutData, () => {
+              canvas.renderAll();
+              // Set all objects to be fully interactive, will be controlled by the toggle effect
+              canvas.getObjects().forEach(obj => {
+                obj.selectable = true;
+                obj.evented = true;
+                obj.hasControls = true;
+                obj.hasBorders = true;
+                obj.lockMovementX = false;
+                obj.lockMovementY = false;
+              });
             });
-          });
-        } catch (e) {
-          console.error('Error loading layout:', e);
+          } catch (e) {
+            console.error('Error loading layout:', e);
+          }
         }
+
+        canvas.on('object:modified', () => {
+          if (allowCustomize && isMounted) {
+            setCanvasData(canvas.toJSON());
+          }
+        });
       }
+    }
 
-      canvas.on('object:modified', () => {
-        if (allowCustomize) {
-          setCanvasData(canvas.toJSON());
+    // Cleanup when effect re-runs or component unmounts
+    return () => {
+      isMounted = false;
+      console.log('[canvas] cleanup BookingManagement', { time: Date.now() });
+      if (fabricCanvasRef.current) {
+        try {
+          const wrapperEl = fabricCanvasRef.current.__wrapperEl;
+          const ce = fabricCanvasRef.current.__canvasEl;
+          const sync = fabricCanvasRef.current.__syncPosition;
+          fabricCanvasRef.current.dispose();
+          if (ce && ce.parentNode) ce.parentNode.removeChild(ce);
+          if (wrapperEl && wrapperEl.parentNode) wrapperEl.parentNode.removeChild(wrapperEl);
+          if (sync) {
+            window.removeEventListener('resize', sync);
+            window.removeEventListener('scroll', sync);
+          }
+        } catch (err) {
+          console.warn('Error disposing canvas (cleanup):', err?.message || err);
         }
-      });
-    }
-
-    // Cleanup when modal closes
-    if (!showModal && fabricCanvasRef.current) {
-      fabricCanvasRef.current.dispose();
-      fabricCanvasRef.current = null;
-    }
+        fabricCanvasRef.current = null;
+      }
+    };
   }, [showModal, selectedPackage]);
 
   // Helper function to update canvas customization state
@@ -212,6 +282,10 @@ export default function BookingManagement() {
   useEffect(() => {
     if (fabricCanvasRef.current) {
       updateCanvasCustomization(fabricCanvasRef.current, allowCustomize);
+      try {
+        const wrapper = fabricCanvasRef.current.__wrapperEl;
+        if (wrapper) wrapper.style.pointerEvents = allowCustomize ? 'auto' : 'none';
+      } catch (e) {}
     }
   }, [allowCustomize]);
 
@@ -233,8 +307,7 @@ export default function BookingManagement() {
         body = { 
           ...formData, 
           customer_id: userId,
-          custom_layout: allowCustomize && canvasData ? JSON.stringify(canvasData) : null,
-          has_custom_layout: allowCustomize && canvasData ? 1 : 0
+          custom_layout: allowCustomize && canvasData ? JSON.stringify(canvasData) : null
         };
       } else {
         url = `http://localhost:3001/api/bookings/update/${formData.booking_id}`;
@@ -253,8 +326,22 @@ export default function BookingManagement() {
       if (data.status === "success") {
         setShowModal(false);
         setAllowCustomize(false);
+        // Dispose canvas and remove its element & wrapper
         if (fabricCanvasRef.current) {
-          fabricCanvasRef.current.dispose();
+          try {
+            const wrapperEl = fabricCanvasRef.current.__wrapperEl;
+            const ce = fabricCanvasRef.current.__canvasEl;
+            const sync = fabricCanvasRef.current.__syncPosition;
+            fabricCanvasRef.current.dispose();
+            if (ce && ce.parentNode) ce.parentNode.removeChild(ce);
+            if (wrapperEl && wrapperEl.parentNode) wrapperEl.parentNode.removeChild(wrapperEl);
+            if (sync) {
+              window.removeEventListener('resize', sync);
+              window.removeEventListener('scroll', sync);
+            }
+          } catch (err) {
+            console.warn('Error disposing canvas after submit:', err?.message || err);
+          }
           fabricCanvasRef.current = null;
         }
         // Refresh list
@@ -280,14 +367,28 @@ export default function BookingManagement() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "cancelled" })
       });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
       const data = await res.json();
       
       if (data.status === "success") {
         // Re-fetch data to ensure UI matches Database perfectly
         const user = JSON.parse(sessionStorage.getItem("user"));
+        if (!user) {
+          navigate("/login");
+          return;
+        }
+        
         const userId = user.id || user.Account_ID;
         
         const bookRes = await fetch(`http://localhost:3001/api/bookings/my-bookings/${userId}`);
+        if (!bookRes.ok) {
+          throw new Error(`HTTP error! status: ${bookRes.status}`);
+        }
+        
         const bookData = await bookRes.json();
         setBookings(bookData.bookings || []);
       } else {
@@ -341,7 +442,7 @@ export default function BookingManagement() {
 
           {loading && <div className="bm-loading">Loading bookings...</div>}
           
-          {!loading && bookings.length === 0 && (
+          {!loading && (bookings.length === 0 || bookings.filter(b => b.status !== 'cancelled').length === 0) && (
             <div className="bm-empty">
               <p>You haven't booked any events yet.</p>
               <button onClick={() => navigate("/customer-packages")}>Browse Packages</button>
@@ -349,8 +450,8 @@ export default function BookingManagement() {
           )}
 
           <div className="bm-grid">
-            {bookings.map((booking) => (
-              <div key={booking.booking_id} className={`bm-card ${booking.status === 'cancelled' ? 'dimmed' : ''}`}>
+            {bookings.filter(booking => booking.status !== 'cancelled').map((booking) => (
+              <div key={booking.booking_id} className="bm-card">
                 <div className="bm-card-header">
                   <span className="bm-date-badge">
                     {new Date(booking.event_date).getDate()}
@@ -439,7 +540,20 @@ export default function BookingManagement() {
                     setSelectedPackage(pkg || null);
                     // Reset canvas when package changes
                     if (fabricCanvasRef.current) {
-                      fabricCanvasRef.current.dispose();
+                      try {
+                        const wrapperEl = fabricCanvasRef.current.__wrapperEl;
+                        const ce = fabricCanvasRef.current.__canvasEl;
+                        const sync = fabricCanvasRef.current.__syncPosition;
+                        fabricCanvasRef.current.dispose();
+                        if (ce && ce.parentNode) ce.parentNode.removeChild(ce);
+                        if (wrapperEl && wrapperEl.parentNode) wrapperEl.parentNode.removeChild(wrapperEl);
+                        if (sync) {
+                          window.removeEventListener('resize', sync);
+                          window.removeEventListener('scroll', sync);
+                        }
+                      } catch (err) {
+                        console.warn('Error disposing canvas on package change:', err?.message || err);
+                      }
                       fabricCanvasRef.current = null;
                     }
                   }}
@@ -523,7 +637,7 @@ export default function BookingManagement() {
                 <div className="bm-canvas-section" style={{display: 'flex', flexDirection: 'column', minHeight: '600px'}}>
                   <h3 style={{marginBottom: '10px'}}>Event Layout Preview</h3>
                   <div style={{flex: 1, border: '3px solid #d1d5db', borderRadius: '10px', position: 'relative', overflow: 'hidden', display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start'}}>
-                        <canvas ref={canvasRef} style={{display: 'block'}} />
+                          <div ref={canvasContainerRef} style={{display: 'block', width: '100%', height: '100%'}} />
                         {/* Message overlay when not customizing */}
                         {!allowCustomize && (
                           <div style={{
@@ -536,7 +650,8 @@ export default function BookingManagement() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            pointerEvents: 'none',
+                            pointerEvents: 'auto',
+                            zIndex: 1001,
                             borderRadius: '8px',
                             color: 'white',
                             fontSize: '16px',

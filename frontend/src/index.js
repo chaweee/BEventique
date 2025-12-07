@@ -6,9 +6,8 @@ import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
+  // StrictMode disabled temporarily for debugging lifecycle double-mount issues
+  <App />
 );
 
 // Global error & promise rejection logging (helps capture issues for diagnostics)

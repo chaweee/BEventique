@@ -29,7 +29,7 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
   const [files, setFiles] = useState([]); // array of {file, preview}
   const [deletedPhotos, setDeletedPhotos] = useState([]); // track deleted existing photos
   const [includePlatform, setIncludePlatform] = useState(false);
-  const canvasRef = useRef(null);
+  const canvasContainerRef = useRef(null);
   const fabricCanvasRef = useRef(null);
   const [canvasData, setCanvasData] = useState(null);
   const [itemCounts, setItemCounts] = useState({
@@ -179,7 +179,20 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
       setForm(emptyForm);
       setError("");
       if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.dispose();
+        try {
+          const wrapperEl = fabricCanvasRef.current.__wrapperEl;
+          const ce = fabricCanvasRef.current.__canvasEl;
+          const sync = fabricCanvasRef.current.__syncPosition;
+          fabricCanvasRef.current.dispose();
+          if (ce && ce.parentNode) ce.parentNode.removeChild(ce);
+          if (wrapperEl && wrapperEl.parentNode) wrapperEl.parentNode.removeChild(wrapperEl);
+          if (sync) {
+            window.removeEventListener('resize', sync);
+            window.removeEventListener('scroll', sync);
+          }
+        } catch (err) {
+          console.warn('Error disposing canvas (EditPackageModal cleanup):', err?.message || err);
+        }
         fabricCanvasRef.current = null;
       }
       setCanvasData(null);
@@ -197,22 +210,42 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
 
   // Initialize Fabric canvas when modal opens and loading is complete
   useEffect(() => {
-    if (isOpen && !loading && canvasRef.current && !fabricCanvasRef.current) {
+    if (isOpen && !loading && canvasContainerRef.current && !fabricCanvasRef.current) {
       // Small delay to ensure DOM is fully rendered after loading completes
       const timer = setTimeout(() => {
-        if (!canvasRef.current) return;
-        const container = canvasRef.current.parentElement;
+        if (!canvasContainerRef.current) return;
+        const container = canvasContainerRef.current;
         if (!container) return;
         
         const containerWidth = container.clientWidth;
         const containerHeight = container.clientHeight;
         
-        const canvas = new window.fabric.Canvas(canvasRef.current, {
+        const wrapper = document.createElement('div');
+        wrapper.style.position = 'absolute';
+        const rect = container.getBoundingClientRect();
+        wrapper.style.left = rect.left + window.scrollX + 'px';
+        wrapper.style.top = rect.top + window.scrollY + 'px';
+        wrapper.style.width = containerWidth + 'px';
+        wrapper.style.height = containerHeight + 'px';
+        wrapper.style.overflow = 'hidden';
+        wrapper.style.pointerEvents = 'none';
+        wrapper.style.zIndex = '1000';
+        document.body.appendChild(wrapper);
+
+        const canvasEl = document.createElement('canvas');
+        canvasEl.style.display = 'block';
+        canvasEl.width = containerWidth;
+        canvasEl.height = containerHeight;
+        wrapper.appendChild(canvasEl);
+
+        const canvas = new window.fabric.Canvas(canvasEl, {
           width: containerWidth,
           height: containerHeight,
           backgroundColor: '#1f2937',
           uniformScaling: true,
         });
+        canvas.__canvasEl = canvasEl;
+        canvas.__wrapperEl = wrapper;
         fabricCanvasRef.current = canvas;
 
         // Update canvas data on any change
@@ -225,6 +258,18 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
         canvas.on('object:removed', () => {
           setCanvasData(canvas.toJSON());
         });
+
+        // sync wrapper position
+        const syncPosition = () => {
+          const r = container.getBoundingClientRect();
+          wrapper.style.left = r.left + window.scrollX + 'px';
+          wrapper.style.top = r.top + window.scrollY + 'px';
+          wrapper.style.width = r.width + 'px';
+          wrapper.style.height = r.height + 'px';
+        };
+        window.addEventListener('resize', syncPosition);
+        window.addEventListener('scroll', syncPosition);
+        canvas.__syncPosition = syncPosition;
         
         // Load existing canvas data if available
         if (canvasData) {
@@ -609,7 +654,7 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
 
                 {/* Canvas Area */}
                 <div style={{ flex: 1, border: '3px solid #d1d5db', borderRadius: '10px', position: 'relative', minHeight: '600px', overflow: 'hidden', display: 'flex' }}>
-                  <canvas ref={canvasRef} />
+                  <div ref={canvasContainerRef} style={{ width: '100%', height: '100%' }} />
                   <button onClick={deleteSelected} style={{ position: 'absolute', top: '14px', right: '14px', padding: '10px 18px', background: '#374151', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: 500, zIndex: 10 }}>Delete Selected</button>
                 </div>
               </>

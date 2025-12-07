@@ -406,3 +406,171 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Booking Preview */
+.bp-preview-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 80px);
+  padding: 2rem;
+}
+
+.bp-preview-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  max-width: 600px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.bp-preview-header {
+  background: linear-gradient(135deg, var(--bp-primary) 0%, #20a088 100%);
+  padding: 2rem;
+  color: white;
+  text-align: center;
+}
+
+.bp-preview-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.bp-preview-header p {
+  margin: 0.5rem 0 0 0;
+  opacity: 0.9;
+}
+
+.bp-preview-content {
+  padding: 2rem;
+}
+
+.bp-preview-section {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.bp-preview-section:last-of-type:not(.bp-preview-total) {
+  border-bottom: none;
+}
+
+.bp-preview-section h3 {
+  margin: 0 0 1rem 0;
+  color: var(--bp-dark);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.bp-preview-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  color: #333;
+}
+
+.bp-preview-row span {
+  color: #666;
+  font-weight: 500;
+}
+
+.bp-preview-row strong {
+  color: var(--bp-dark);
+  font-weight: 600;
+}
+
+.bp-receipt-id {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--bp-primary);
+  font-family: 'Courier New', monospace;
+  letter-spacing: 2px;
+  margin: 0;
+}
+
+.bp-preview-total {
+  background: #f6fbf8;
+  padding: 1rem;
+  margin: 0;
+  border-radius: 8px;
+  border: 2px solid var(--bp-primary);
+  font-size: 1.2rem;
+}
+
+.bp-preview-total span {
+  color: var(--bp-dark);
+}
+
+.bp-preview-total strong {
+  color: var(--bp-primary);
+  font-size: 1.3rem;
+}
+
+.bp-preview-actions {
+  padding: 2rem;
+  display: flex;
+  gap: 1rem;
+  flex-direction: column;
+  background: #f9f9f9;
+}
+
+.bp-receipt-btn,
+.bp-home-btn {
+  padding: 1rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.bp-receipt-btn {
+  background: var(--bp-primary);
+  color: white;
+}
+
+.bp-receipt-btn:hover {
+  background: #20a088;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(38, 191, 160, 0.3);
+}
+
+.bp-home-btn {
+  background: var(--bp-navbar);
+  color: white;
+}
+
+.bp-home-btn:hover {
+  background: #885f3d;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(153, 122, 74, 0.3);
+}
+
+@media (max-width: 768px) {
+  .bp-preview-container {
+    padding: 1rem;
+  }
+
+  .bp-preview-card {
+    border-radius: 12px;
+  }
+
+  .bp-preview-header {
+    padding: 1.5rem;
+  }
+
+  .bp-preview-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .bp-preview-content,
+  .bp-preview-actions {
+    padding: 1.5rem;
+  }
+}

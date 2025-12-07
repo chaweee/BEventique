@@ -19,8 +19,8 @@ router.post("/create", async (req, res) => {
         } = req.body;
 
         // Log the received data for debugging
-        console.log("Booking Create Request - Received Data:");
-        console.log("customer_id:", customer_id);
+        console.log("=== BOOKING CREATE REQUEST ===");
+        console.log("customer_id:", customer_id, "Type:", typeof customer_id);
         console.log("package_id:", package_id);
         console.log("event_date:", event_date);
         console.log("location:", location);
@@ -52,16 +52,35 @@ router.post("/create", async (req, res) => {
             });
         }
 
-        // Get Package Price to calculate total
-        const [pkgRows] = await global.db.query("SELECT Package_Amount FROM package WHERE Package_ID = ?", [package_id]);
+        // Get Package Details
+        const [pkgRows] = await global.db.query("SELECT Package_Name, Package_Amount, Description, NumTables, NumRoundTables, NumChairs, NumTent, NumPlatform FROM package WHERE Package_ID = ?", [package_id]);
+        const packageName = pkgRows.length ? pkgRows[0].Package_Name : "Unknown Package";
+        const packageDescription = pkgRows.length ? pkgRows[0].Description : "";
         const basePrice = pkgRows.length ? pkgRows[0].Package_Amount : 0;
         const totalPrice = basePrice; // Can be modified later for discounts, etc.
+        
+        // Build package inclusions from table counts
+        const packageInclusions = pkgRows.length ? [
+            pkgRows[0].NumTables > 0 ? `${pkgRows[0].NumTables} Tables` : null,
+            pkgRows[0].NumRoundTables > 0 ? `${pkgRows[0].NumRoundTables} Round Tables` : null,
+            pkgRows[0].NumChairs > 0 ? `${pkgRows[0].NumChairs} Chairs` : null,
+            pkgRows[0].NumTent > 0 ? `${pkgRows[0].NumTent} Tent(s)` : null,
+            pkgRows[0].NumPlatform > 0 ? `${pkgRows[0].NumPlatform} Platform(s)` : null
+        ].filter(Boolean).join(", ") : "";
+        
+        // Get Customer Full Name
+        const [customerRows] = await global.db.query("SELECT FirstName, LastName, Email, PhoneNumber FROM account WHERE Account_ID = ?", [customer_id]);
+        console.log("Customer query for Account_ID:", customer_id, "Result:", customerRows);
+        const customerName = customerRows.length ? `${customerRows[0].FirstName} ${customerRows[0].LastName}` : "Unknown Customer";
+        const customerEmail = customerRows.length ? customerRows[0].Email : "";
+        const customerPhone = customerRows.length ? customerRows[0].PhoneNumber : "";
+        console.log("Customer name:", customerName, "Email:", customerEmail, "Phone:", customerPhone);
         
         // Insert Booking
         const sql = `
             INSERT INTO bookings 
-            (customer_id, package_id, event_date, event_time, location, base_price, total_price, custom_layout, has_custom_layout, notes, status, payment_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid')
+            (customer_id, package_id, event_date, event_time, location, base_price, total_price, custom_layout, notes, status, payment_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid')
         `;
 
         const [result] = await global.db.query(sql, [
@@ -73,14 +92,20 @@ router.post("/create", async (req, res) => {
             basePrice,
             totalPrice,
             custom_layout || null,
-            custom_layout ? 1 : 0,
             notes || null
         ]);
 
         return res.json({
             status: "success",
             message: "Booking request submitted successfully!",
-            booking_id: result.insertId
+            booking_id: result.insertId,
+            customer_name: customerName,
+            customer_email: customerEmail,
+            customer_phone: customerPhone,
+            package_name: packageName,
+            package_description: packageDescription,
+            package_inclusions: packageInclusions,
+            package_price: basePrice
         });
 
     } catch (err) {
