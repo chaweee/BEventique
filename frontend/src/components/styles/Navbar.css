@@ -1,7 +1,7 @@
 .navbar {
   width: 100%;
   padding: 15px 40px;
-  background: #f8e9f1;
+  background: #895129;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -11,7 +11,7 @@
 .nav-logo {
   font-size: 22px;
   font-weight: bold;
-  color: #a94470;
+  color: #ffffff;
 }
 
 .nav-links {
@@ -23,7 +23,7 @@
 .nav-links li {
   cursor: pointer;
   font-size: 16px;
-  color: #0b2747;
+  color: #ffffff;
   padding: 8px 12px;
   border-radius: 8px;
   transition: 0.2s;
@@ -31,20 +31,20 @@
 }
 
 .nav-links li:hover {
-  color: #a94470;
+  color: #ffffff;
   transform: translateY(-2px);
-  background: rgba(14,164,122,0.06);
+  background: rgba(255,255,255,0.15);
 }
 
 .nav-logout {
   cursor: pointer;
   user-select: none;
-  color: #0b2747;
+  color: #ffffff;
 }
 
 .nav-logout:focus {
   outline: none;
-  box-shadow: 0 0 0 4px rgba(47,215,176,0.12);
-  background: rgba(14,164,122,0.06);
+  box-shadow: 0 0 0 4px rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.15);
   transform: translateY(-2px);
 }

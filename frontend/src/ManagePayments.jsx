@@ -21,7 +21,9 @@ export default function ManagePayments() {
         <thead>
           <tr>
             <th>Booking ID</th>
+            <th>Date</th>
             <th>Client</th>
+            <th>Package</th>
             <th>Amount Due</th>
             <th>Payment Status</th>
           </tr>
@@ -30,12 +32,14 @@ export default function ManagePayments() {
           {payments.map(p => (
             <tr key={p.booking_id}>
               <td>#{p.booking_id}</td>
+              <td>{new Date(p.event_date).toLocaleDateString()}</td>
               <td>{p.client_name}</td>
-              <td className="amount">₱{Number(p.total_amount).toLocaleString()}</td>
+              <td>{p.Package_Name}</td>
+              <td className="amount">₱{Number(p.amount_due).toLocaleString()}</td>
               <td>
-                {['confirmed', 'completed'].includes(p.booking_status) 
+                {p.payment_status === 'paid' 
                   ? <span className="badge completed">Paid</span>
-                  : <span className="badge pending">Unpaid / Pending</span>
+                  : <span className="badge pending">Unpaid</span>
                 }
               </td>
             </tr>

@@ -162,4 +162,32 @@ router.post("/update-hash", async (req, res) => {
     }
 });
 
+// ----------------------
+// GET ADMIN DETAILS
+// GET /api/auth/admin/:admin_id
+// ----------------------
+router.get("/admin/:admin_id", async (req, res) => {
+    try {
+        const { admin_id } = req.params;
+
+        const [rows] = await global.db.query(
+            "SELECT Account_ID as id, FirstName as firstname, LastName as lastname, M_I, Email, Role FROM account WHERE Account_ID = ? LIMIT 1",
+            [admin_id]
+        );
+
+        if (!rows.length) {
+            return res.json({ status: "error", message: "Admin not found" });
+        }
+
+        return res.json({ 
+            status: "success", 
+            admin: rows[0]
+        });
+
+    } catch (err) {
+        console.error("Get admin details error:", err);
+        return res.status(500).json({ status: "error", message: "Server error" });
+    }
+});
+
 module.exports = router;

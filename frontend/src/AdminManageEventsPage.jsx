@@ -1,5 +1,6 @@
 import React from "react";
 import AdminSidebar from "./AdminSidebar";
+import AdminContentHeader from "./AdminContentHeader";
 import ManageEvent from "./ManageEvent";
 import "./AdminDashboard.css";
 
@@ -8,10 +9,7 @@ export default function AdminManageEventsPage() {
     <div className="admin-root">
       <AdminSidebar />
       <main className="admin-content">
-        <header className="content-header">
-          <h1>Manage Schedule</h1>
-          <div className="user-profile">Administrator</div>
-        </header>
+        <AdminContentHeader title="Manage Schedule" />
         <div className="content-body">
           <ManageEvent />
         </div>

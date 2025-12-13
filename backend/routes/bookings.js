@@ -79,13 +79,14 @@ router.post("/create", async (req, res) => {
         // Insert Booking
         const sql = `
             INSERT INTO bookings 
-            (customer_id, package_id, event_date, event_time, location, base_price, total_price, custom_layout, notes, status, payment_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid')
+            (customer_id, package_id, event_type, event_date, event_time, location, base_price, total_price, custom_layout, notes, status, payment_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid')
         `;
 
         const [result] = await global.db.query(sql, [
             customer_id,
             package_id,
+            event_type || null,
             event_date,
             event_time,
             location,

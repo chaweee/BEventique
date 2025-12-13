@@ -1,5 +1,6 @@
 import React from "react";
 import AdminSidebar from "./AdminSidebar";
+import AdminContentHeader from "./AdminContentHeader";
 import CustomerQueries from "./CustomerQueries";
 import "./AdminDashboard.css";
 
@@ -8,10 +9,7 @@ export default function AdminCustomerQueriesPage() {
     <div className="admin-root">
       <AdminSidebar />
       <main className="admin-content">
-        <header className="content-header">
-          <h1>Customer Queries</h1>
-          <div className="user-profile">Administrator</div>
-        </header>
+        <AdminContentHeader title="Customer Queries" />
         <div className="content-body">
           <CustomerQueries />
         </div>

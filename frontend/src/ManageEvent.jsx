@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from "react";
+import { Search } from "lucide-react";
+import Swal from "sweetalert2";
 
 export default function ManageEvent() {
   const [bookings, setBookings] = useState([]);
+  const [filteredBookings, setFilteredBookings] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterDate, setFilterDate] = useState("");
 
   useEffect(() => {
     fetchBookings();
   }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [bookings, searchQuery, filterStatus, filterDate]);
 
   const fetchBookings = async () => {
     try {
@@ -18,20 +28,144 @@ export default function ManageEvent() {
     } catch (err) { console.error(err); setLoading(false); }
   };
 
-  const updateStatus = async (id, newStatus) => {
-    if(!window.confirm(`Mark this booking as ${newStatus}?`)) return;
-    try {
-      await fetch(`http://localhost:3001/api/bookings/status/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus })
+  const applyFilters = () => {
+    let filtered = bookings;
+
+    // Filter by search query (customer name)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(b => 
+        b.client_name.toLowerCase().includes(query)
+      );
+    }
+
+    // Filter by status
+    if (filterStatus) {
+      filtered = filtered.filter(b => b.status === filterStatus);
+    }
+
+    // Filter by date
+    if (filterDate) {
+      filtered = filtered.filter(b => {
+        const bookingDate = new Date(b.event_date).toLocaleDateString();
+        const selectedDate = new Date(filterDate).toLocaleDateString();
+        return bookingDate === selectedDate;
       });
-      fetchBookings(); // Refresh list
-    } catch(err) { alert("Error updating status"); }
+    }
+
+    setFilteredBookings(filtered);
+  };
+
+  const updateStatus = async (id, newStatus) => {
+    try {
+      const result = await Swal.fire({
+        title: "Update Status",
+        html: `<p>Mark this booking as <strong>${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}</strong>?</p>`,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonColor: "#895129",
+        cancelButtonColor: "#6c757d",
+        confirmButtonText: "Yes, Update",
+        cancelButtonText: "Cancel",
+        customClass: {
+          popup: "sweet-alert-popup",
+          confirmButton: "sweet-alert-confirm",
+          cancelButton: "sweet-alert-cancel"
+        }
+      });
+
+      if (result.isConfirmed) {
+        const res = await fetch(`http://localhost:3001/api/bookings/status/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus })
+        });
+
+        if (res.ok) {
+          await Swal.fire({
+            title: "Success!",
+            text: `Status updated to ${newStatus}`,
+            icon: "success",
+            confirmButtonColor: "#895129",
+            timer: 2000,
+            timerProgressBar: true
+          });
+          fetchBookings();
+        } else {
+          Swal.fire({
+            title: "Error",
+            text: "Failed to update status",
+            icon: "error",
+            confirmButtonColor: "#895129"
+          });
+        }
+      }
+    } catch (err) {
+      Swal.fire({
+        title: "Error",
+        text: "An error occurred while updating status",
+        icon: "error",
+        confirmButtonColor: "#895129"
+      });
+      console.error(err);
+    }
   };
 
   return (
     <div className="table-container">
+      {/* Filters and Search Bar */}
+      <div className="filters-section">
+        <div className="search-bar">
+          <Search size={20} />
+          <input
+            type="text"
+            placeholder="Search by customer name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="search-input"
+          />
+        </div>
+
+        <div className="filters-group">
+          <select 
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="filter-select"
+          >
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+
+          <input
+            type="date"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            className="filter-date"
+          />
+
+          {(searchQuery || filterStatus || filterDate) && (
+            <button 
+              className="clear-filters-btn"
+              onClick={() => {
+                setSearchQuery("");
+                setFilterStatus("");
+                setFilterDate("");
+              }}
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Results count */}
+      <div className="results-info">
+        Showing {filteredBookings.length} of {bookings.length} bookings
+      </div>
+
       <table className="admin-table">
         <thead>
           <tr>
@@ -44,7 +178,7 @@ export default function ManageEvent() {
           </tr>
         </thead>
         <tbody>
-          {bookings.map(b => (
+          {filteredBookings.map(b => (
             <tr key={b.booking_id}>
               <td>{new Date(b.event_date).toLocaleDateString()}</td>
               <td>

@@ -1,5 +1,6 @@
 import React from "react";
 import AdminSidebar from "./AdminSidebar";
+import AdminContentHeader from "./AdminContentHeader";
 import ManagePayments from "./ManagePayments";
 import "./AdminDashboard.css";
 
@@ -8,10 +9,7 @@ export default function AdminManagePaymentsPage() {
     <div className="admin-root">
       <AdminSidebar />
       <main className="admin-content">
-        <header className="content-header">
-          <h1>Manage Payments</h1>
-          <div className="user-profile">Administrator</div>
-        </header>
+        <AdminContentHeader title="Manage Payments" />
         <div className="content-body">
           <ManagePayments />
         </div>
