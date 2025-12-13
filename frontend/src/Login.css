@@ -1,15 +1,23 @@
-/* Background */
+/* ================================
+   PAGE BACKGROUND
+================================ */
 .login-container {
   width: 100%;
   height: 100vh;
-  background: #fdf6f3;
+  background: linear-gradient(
+    135deg,
+    #f4eee9,   /* warm light beige */
+    #e2d5cb    /* soft brown tint */
+  );
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 120px;
 }
 
-/* Left empty display panel */
+/* ================================
+   LEFT DISPLAY PANEL
+================================ */
 .login-left-panel {
   width: 400px;
   height: 480px;
@@ -20,11 +28,13 @@
   box-shadow: 0 0 40px rgba(109, 212, 168, 0.15);
 }
 
-/* Right card */
+/* ================================
+   LOGIN CARD
+================================ */
 .login-card {
   width: 420px;
   background: #ffffff;
-  padding: 40px 40px;
+  padding: 40px;
   border-radius: 20px;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
   text-align: center;
@@ -37,7 +47,9 @@
   margin-bottom: 30px;
 }
 
-/* Inputs */
+/* ================================
+   INPUT FIELDS
+================================ */
 .login-input {
   width: 100%;
   padding: 14px;
@@ -50,24 +62,33 @@
   outline: none;
 }
 
-/* Button */
+/* ================================
+   BUTTON
+================================ */
 .login-btn {
   width: 100%;
   padding: 14px;
-  background: linear-gradient(90deg, #c8f5df, #a5edcd);
+  background: linear-gradient(
+    90deg,
+    #c6a98b,
+    #b08968
+  );
+  color: #ffffff;
   border: none;
   border-radius: 12px;
   font-size: 16px;
   cursor: pointer;
   margin-top: 10px;
-  transition: 0.2s;
+  transition: opacity 0.2s ease;
 }
 
 .login-btn:hover {
   opacity: 0.9;
 }
 
-/* Switch text */
+/* ================================
+   SWITCH TEXT
+================================ */
 .login-switch {
   margin-top: 18px;
   font-size: 14px;
@@ -78,9 +99,12 @@
   color: #ac1f1a;
   font-weight: 600;
   cursor: pointer;
+  text-decoration: none;
 }
 
-/* Footer */
+/* ================================
+   FOOTER
+================================ */
 .login-footer {
   margin-top: 25px;
   font-size: 13px;

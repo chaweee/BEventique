@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import InputField from "./InputField";
 import CoolButton from "./CoolButton";
 import logo from "./components/assets/logo.png";
+import bgImage from "./components/assets/bg.jpg";
 import "./Signup.css";
 import "./InputField.css";
 import "./CoolButton.css";
@@ -70,8 +71,23 @@ export default function Login() {
   };
 
   return (
-    <div className="signup-root">
-      <div className="signup-split">
+    <div className="signup-root" style={{
+      backgroundImage: `url(${bgImage})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      position: 'relative'
+    }}>
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+        zIndex: 0
+      }} />
+      <div className="signup-split" style={{position: 'relative', zIndex: 1}}>
 
         {/* LEFT: Glass Login Form */}
         <section className="signup-left">
@@ -120,11 +136,21 @@ export default function Login() {
 
         {/* RIGHT: Logo Showcase */}
         <aside className="signup-right" aria-hidden>
-          <div className="logo-panel">
+          <div className="logo-panel" style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'transparent'
+          }}>
             <img
               src={logo}
               alt="Eventique Logo"
               className="logo-showcase"
+              style={{
+                width: '350px',
+                height: 'auto',
+                filter: 'drop-shadow(0 20px 40px rgba(0, 0, 0, 0.3)) drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2))'
+              }}
             />
           </div>
         </aside>
