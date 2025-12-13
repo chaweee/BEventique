@@ -8,7 +8,8 @@
   --navbar-accent: #c9a96e;
 }
 *{box-sizing:border-box}
-body{font-family:'Poppins', Inter, system-ui, -apple-system; margin:0; background:var(--bg); color:var(--muted);}
+body{font-family:'Poppins', Inter, system-ui, -apple-system; margin:0; background:var(--bg); color:var(--muted); scrollbar-width: none; -ms-overflow-style: none;}
+body::-webkit-scrollbar { display: none; }
 
 .ch-root { min-height:100vh; display:flex; flex-direction:column; }
 

@@ -176,6 +176,7 @@ app.use("/uploads", express.static(__dirname + "/uploads"));
     app.use("/api/bookings", require("./routes/bookings"));
     app.use("/api/design", require("./routes/design"));
     app.use("/api/packages", require("./routes/packages"));
+    app.use("/api/queries", require("./routes/queries"));
     app.use("/api/upload", require("./routes/upload"));
     
     // Global Express error handler

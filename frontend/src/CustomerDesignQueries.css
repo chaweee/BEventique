@@ -1,5 +1,16 @@
 /* Customer Design Queries - Messenger Style */
 
+:root{
+  --bg:#f6fbf8;
+  --glass: rgba(255,255,255,0.9);
+  --accent:#26bfa0;
+  --muted:#083a31;
+  --card-shadow: 0 12px 40px rgba(6,55,44,0.06);
+  --navbar-bg: #997a4a;
+}
+*{box-sizing:border-box}
+body{font-family:'Poppins', Inter, system-ui, -apple-system; margin:0; background:var(--bg); color:var(--muted);}
+
 .cdq-root {
   min-height: 100vh;
   display: flex;
@@ -7,54 +18,39 @@
   background: #f0f2f5;
 }
 
-/* Header */
-.cdq-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 1rem 2rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+/* Navbar - Match Packages navbar style */
+.cdq-navbar {
+  display:flex; align-items:center; justify-content:center;
+  padding:0; height:60px; background:var(--navbar-bg);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.15);
 }
 
-.cdq-brand {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: white;
-  cursor: pointer;
+.cdq-navbar-container {
+  width:100%; max-width:1400px; display:flex; align-items:center; justify-content:space-between; padding:0 24px;
 }
 
-.cdq-nav {
-  display: flex;
-  gap: 1.5rem;
+.cdq-navbar-brand {
+  text-align:center;
 }
 
-.cdq-nav button {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.8);
-  font-weight: 500;
-  cursor: pointer;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  transition: all 0.2s;
+.cdq-brand-title {
+  margin:0; font-size:20px; font-weight:400; color:white; letter-spacing:0.5px; font-family:'Poppins', serif;
 }
 
-.cdq-nav button:hover,
-.cdq-nav button.active {
-  color: white;
-  background: rgba(255, 255, 255, 0.2);
+.cdq-nav { 
+  display:flex; gap:32px; align-items:center; 
 }
 
-.cdq-logout {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
+.cdq-link { 
+  background:none; border:none; padding:8px 0; cursor:pointer; color:white; 
+  font-weight:300; font-size:14px; letter-spacing:0.5px; transition:all 0.2s; font-family:'Poppins';
 }
+
+.cdq-link:hover { 
+  color:#c9a96e; opacity:0.9;
+}
+
+.cdq-logout { cursor:pointer; }
 
 /* Main Messenger Container */
 .cdq-main {
@@ -205,6 +201,8 @@
   display: flex;
   flex-direction: column;
   background: white;
+  height: 100%;
+  overflow: hidden;
 }
 
 .cdq-no-selection {
@@ -261,8 +259,29 @@
 .cdq-messages {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 1.5rem;
   background: #f0f2f5;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.cdq-messages::-webkit-scrollbar {
+  width: 8px;
+}
+
+.cdq-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cdq-messages::-webkit-scrollbar-thumb {
+  background: #d0d0d0;
+  border-radius: 4px;
+}
+
+.cdq-messages::-webkit-scrollbar-thumb:hover {
+  background: #b0b0b0;
 }
 
 .cdq-message {
@@ -294,6 +313,11 @@
   color: #050505;
 }
 
+.cdq-message.admin .message-bubble {
+  background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+  color: white;
+}
+
 .message-header {
   display: flex;
   justify-content: space-between;
@@ -310,6 +334,10 @@
   color: #65676b;
 }
 
+.cdq-message.admin .message-header {
+  color: rgba(255, 255, 255, 0.95);
+}
+
 .message-time {
   font-size: 0.7rem;
   margin-left: 0.5rem;
@@ -318,6 +346,15 @@
 .message-text {
   font-size: 0.938rem;
   line-height: 1.4;
+}
+
+.message-reply-to {
+  font-size: 0.7rem;
+  margin-top: 0.5rem;
+  opacity: 0.8;
+  font-style: italic;
+  border-left: 2px solid rgba(255, 255, 255, 0.5);
+  padding-left: 0.5rem;
 }
 
 /* Message Input */
@@ -422,17 +459,20 @@
 }
 
 .cdq-form-group input,
-.cdq-form-group textarea {
+.cdq-form-group textarea,
+.cdq-form-group select {
   width: 100%;
   padding: 0.75rem;
   border: 1px solid #e4e6eb;
   border-radius: 8px;
   font-size: 0.938rem;
   outline: none;
+  font-family: inherit;
 }
 
 .cdq-form-group input:focus,
-.cdq-form-group textarea:focus {
+.cdq-form-group textarea:focus,
+.cdq-form-group select:focus {
   border-color: #667eea;
 }
 
@@ -480,4 +520,73 @@
   padding: 2rem;
   text-align: center;
   color: #65676b;
+}
+/* Reply Form */
+.cdq-reply-form {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e4e6eb;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cdq-reply-form textarea {
+  padding: 0.75rem 1rem;
+  border: 1px solid #e4e6eb;
+  border-radius: 8px;
+  font-size: 0.938rem;
+  font-family: 'Poppins', sans-serif;
+  outline: none;
+  resize: vertical;
+  min-height: 70px;
+}
+
+.cdq-reply-form textarea:focus {
+  border-color: #26bfa0;
+  box-shadow: 0 0 0 3px rgba(38, 191, 160, 0.1);
+}
+
+.cdq-reply-form textarea:disabled {
+  background: #f5f5f5;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cdq-reply-send-btn {
+  align-self: flex-end;
+  padding: 0.75rem 2rem;
+  background: linear-gradient(135deg, #26bfa0 0%, #1a9981 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.938rem;
+  transition: all 0.2s;
+}
+
+.cdq-reply-send-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(38, 191, 160, 0.3);
+}
+
+.cdq-reply-send-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cdq-loading-messages {
+  padding: 2rem;
+  text-align: center;
+  color: #65676b;
+  font-size: 0.938rem;
+}
+
+.cdq-no-replies {
+  padding: 2rem;
+  text-align: center;
+  color: #b0b3b8;
+  font-style: italic;
+  font-size: 0.938rem;
 }
