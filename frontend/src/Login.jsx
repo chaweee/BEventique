@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import InputField from "./InputField";
 import CoolButton from "./CoolButton";
+import logo from "./components/assets/logo.png";
 import "./Signup.css";
 import "./InputField.css";
 import "./CoolButton.css";
@@ -14,13 +15,13 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // NEW: success dialog + stored user
   const [showSuccess, setShowSuccess] = useState(false);
   const [loggedUser, setLoggedUser] = useState(null);
 
   const submitLogin = async (e) => {
-    e && e.preventDefault();
+    e.preventDefault();
     setError("");
+
     if (!email.trim() || !password) {
       setError("Email and password are required");
       return;
@@ -35,43 +36,30 @@ export default function Login() {
       });
 
       const text = await res.text();
-      let data;
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch (parseErr) {
-        const stripped = text.replace(/<[^>]*>?/gm, "").trim();
-        console.error("Login response (non-JSON):", stripped || text);
-        throw new Error(stripped || "Server returned an unexpected response");
-      }
-
-      console.log("login response:", res.status, data);
+      const data = text ? JSON.parse(text) : {};
 
       if (!res.ok) {
-        // If backend returns a JSON error message, show it
-        throw new Error(data.message || `Request failed (${res.status})`);
+        throw new Error(data.message || "Login failed");
       }
 
       if (data.status === "success" && data.user) {
-        // Save minimal user info in sessionStorage (used by other components)
         sessionStorage.setItem("user", JSON.stringify(data.user));
-        // Set logged user and show success dialog (do not navigate immediately)
         setLoggedUser(data.user);
         setShowSuccess(true);
       } else {
         setError(data.message || "Invalid credentials");
       }
     } catch (err) {
-      console.error("Login error:", err);
       setError(err.message || "Network error");
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle continue from dialog
   const handleContinue = () => {
     setShowSuccess(false);
-    const role = (loggedUser?.role || loggedUser?.Role || "").toString().toLowerCase();
+    const role = (loggedUser?.role || "").toLowerCase();
+
     if (role === "admin") {
       navigate("/admin-dashboard");
     } else if (role === "designer") {
@@ -84,19 +72,14 @@ export default function Login() {
   return (
     <div className="signup-root">
       <div className="signup-split">
-        {/* LEFT: image placeholder */}
-        <aside className="signup-right" aria-hidden>
-          <div className="image-panel" />
-        </aside>
 
-        {/* RIGHT: glass form */}
+        {/* LEFT: Glass Login Form */}
         <section className="signup-left">
           <form className="glass-card" onSubmit={submitLogin} noValidate>
             <h1 className="glass-title">Welcome Back</h1>
 
             <InputField
               label="Email"
-              name="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -105,7 +88,6 @@ export default function Login() {
 
             <InputField
               label="Password"
-              name="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -114,34 +96,53 @@ export default function Login() {
 
             {error && <div className="form-error">{error}</div>}
 
-            <div className="actions">
-              <CoolButton type="submit" disabled={loading}>
-                {loading ? "Signing in..." : "Sign In"}
-              </CoolButton>
-            </div>
+            <CoolButton type="submit" disabled={loading}>
+              {loading ? "Signing in..." : "Sign In"}
+            </CoolButton>
 
             <div className="foot-row">
-              <div className="signin-link">
+              <span>
                 Don't have an account?{" "}
-                <button type="button" className="link-btn" onClick={() => navigate("/signup")}>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => navigate("/signup")}
+                >
                   Sign Up
                 </button>
-              </div>
-              <div className="copyright">© 2025 Catering Service</div>
+              </span>
+              <span className="copyright">
+                © 2025 Catering Service
+              </span>
             </div>
           </form>
         </section>
+
+        {/* RIGHT: Logo Showcase */}
+        <aside className="signup-right" aria-hidden>
+          <div className="logo-panel">
+            <img
+              src={logo}
+              alt="Eventique Logo"
+              className="logo-showcase"
+            />
+          </div>
+        </aside>
+
       </div>
 
-      {/* Success dialog */}
+      {/* Success Modal */}
       {showSuccess && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="login-success">
+        <div className="modal-backdrop">
           <div className="modal-card">
-            <h3 id="login-success">Logged in Successfully</h3>
-            <p>Have a good day{loggedUser?.firstname ? `, ${loggedUser.firstname}` : ""}.</p>
-            <div className="modal-actions">
-              <CoolButton onClick={handleContinue}>Continue</CoolButton>
-            </div>
+            <h3>Logged in Successfully</h3>
+            <p>
+              Have a good day
+              {loggedUser?.firstname ? `, ${loggedUser.firstname}` : ""}.
+            </p>
+            <CoolButton onClick={handleContinue}>
+              Continue
+            </CoolButton>
           </div>
         </div>
       )}

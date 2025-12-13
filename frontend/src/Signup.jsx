@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import InputField from "./InputField";
 import CoolButton from "./CoolButton";
+import logo from "./components/assets/logo.png";
 import "./Signup.css";
 import "./InputField.css";
 import "./CoolButton.css";
@@ -176,7 +177,9 @@ export default function SignUp() {
 
         {/* RIGHT: image placeholder */}
         <aside className="signup-right" aria-hidden>
-          <div className="image-panel" />
+          <div className="image-panel" style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+            <img src={logo} alt="Eventique Logo" style={{width: '200px', height: 'auto', opacity: 0.9}} />
+          </div>
         </aside>
       </div>
 
