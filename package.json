@@ -10,6 +10,7 @@
     "install:all": "npm install --prefix api && npm install --prefix my-app"
   },
   "dependencies": {
+    "@mui/x-charts": "^8.22.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.4.0",
     "three": "^0.181.2"

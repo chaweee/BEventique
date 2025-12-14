@@ -19,7 +19,10 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
     NumTent: 0,
     NumPlatform: 0,
     Package_Amount: "",
+    event_id: "",
   });
+  
+  const [eventTypes, setEventTypes] = useState([]);
 
   const [files, setFiles] = useState([]); // array of {file, preview}
   const [includePlatform, setIncludePlatform] = useState(false);
@@ -34,6 +37,23 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
     platforms: 0,
   });
 
+  // Fetch event types when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      console.log("Fetching event types...");
+      fetch("http://localhost:3001/api/packages/event-types")
+        .then(res => res.json())
+        .then(data => {
+          console.log("Event types response:", data);
+          if (data.status === "success") {
+            console.log("Setting event types:", data.events);
+            setEventTypes(data.events || []);
+          }
+        })
+        .catch(err => console.error("Failed to fetch event types:", err));
+    }
+  }, [isOpen]);
+  
   useEffect(() => {
     if (!isOpen) {
       // cleanup
@@ -48,21 +68,16 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
         NumRoundTables: 0,
         NumChairs: 0,
         NumTent: 0,
+        event_id: "",
         NumPlatform: 0,
         Package_Amount: "",
       });
       setError("");
       if (fabricCanvasRef.current) {
         try {
-          const wrapperEl = fabricCanvasRef.current.__wrapperEl;
-          const ce = fabricCanvasRef.current.__canvasEl;
-          const sync = fabricCanvasRef.current.__syncPosition;
           fabricCanvasRef.current.dispose();
-          if (ce && ce.parentNode) ce.parentNode.removeChild(ce);
-          if (wrapperEl && wrapperEl.parentNode) wrapperEl.parentNode.removeChild(wrapperEl);
-          if (sync) {
-            window.removeEventListener('resize', sync);
-            window.removeEventListener('scroll', sync);
+          if (canvasContainerRef.current) {
+            canvasContainerRef.current.innerHTML = '';
           }
         } catch (err) {
           console.warn('Error disposing canvas (AddPackageModal cleanup):', err?.message || err);
@@ -83,28 +98,47 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
 
   // Initialize Fabric canvas when modal opens
   useEffect(() => {
-    if (isOpen && canvasContainerRef.current && !fabricCanvasRef.current) {
+    if (!isOpen) return;
+    
+    // Load Fabric.js if not already loaded
+    if (!window.fabric) {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js';
+      script.onload = () => {
+        console.log('Fabric.js loaded');
+        setTimeout(initializeCanvas, 100); // Small delay to ensure DOM is ready
+      };
+      document.head.appendChild(script);
+    } else {
+      setTimeout(initializeCanvas, 100); // Small delay to ensure container has dimensions
+    }
+    
+    function initializeCanvas() {
+      if (!canvasContainerRef.current || fabricCanvasRef.current) {
+        console.log('Canvas init skipped:', { hasContainer: !!canvasContainerRef.current, hasCanvas: !!fabricCanvasRef.current });
+        return;
+      }
+      
       const container = canvasContainerRef.current;
       const containerWidth = container.clientWidth;
       const containerHeight = container.clientHeight;
+      
+      console.log('Initializing canvas with dimensions:', { containerWidth, containerHeight });
+      
+      if (containerWidth === 0 || containerHeight === 0) {
+        console.error('Container has no dimensions, retrying...');
+        setTimeout(initializeCanvas, 200);
+        return;
+      }
 
-      const wrapper = document.createElement('div');
-      wrapper.style.position = 'absolute';
-      const rect = container.getBoundingClientRect();
-      wrapper.style.left = rect.left + window.scrollX + 'px';
-      wrapper.style.top = rect.top + window.scrollY + 'px';
-      wrapper.style.width = containerWidth + 'px';
-      wrapper.style.height = containerHeight + 'px';
-      wrapper.style.overflow = 'hidden';
-      wrapper.style.pointerEvents = 'none';
-      wrapper.style.zIndex = '1000';
-      document.body.appendChild(wrapper);
-
+      // Clear container
+      container.innerHTML = '';
+      
       const canvasEl = document.createElement('canvas');
       canvasEl.style.display = 'block';
       canvasEl.width = containerWidth;
       canvasEl.height = containerHeight;
-      wrapper.appendChild(canvasEl);
+      container.appendChild(canvasEl);
 
       const canvas = new window.fabric.Canvas(canvasEl, {
         width: containerWidth,
@@ -112,11 +146,11 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
         backgroundColor: '#1f2937',
         uniformScaling: true,
       });
-      // allow targeting sub-objects inside groups and more precise hit-testing
+      
+      console.log('Canvas created successfully');
+      
       canvas.subTargetCheck = true;
       canvas.perPixelTargetFind = true;
-      canvas.__canvasEl = canvasEl;
-      canvas.__wrapperEl = wrapper;
       fabricCanvasRef.current = canvas;
 
       // Update canvas data on any change
@@ -129,18 +163,6 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
       canvas.on('object:removed', () => {
         setCanvasData(canvas.toJSON());
       });
-
-      // sync wrapper position
-      const syncPosition = () => {
-        const r = container.getBoundingClientRect();
-        wrapper.style.left = r.left + window.scrollX + 'px';
-        wrapper.style.top = r.top + window.scrollY + 'px';
-        wrapper.style.width = r.width + 'px';
-        wrapper.style.height = r.height + 'px';
-      };
-      window.addEventListener('resize', syncPosition);
-      window.addEventListener('scroll', syncPosition);
-      canvas.__syncPosition = syncPosition;
     }
   }, [isOpen]);
 
@@ -177,7 +199,7 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
     const table = new window.fabric.Rect({
       width: 50,
       height: 40,
-      fill: 'transparent',
+      fill: 'rgba(255, 255, 255, 0.05)',
       stroke: '#ffffff',
       strokeWidth: 1,
       left: -25,
@@ -218,7 +240,7 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
     }
     const chair = new window.fabric.Circle({
       radius: 15,
-      fill: 'transparent',
+      fill: 'rgba(255, 255, 255, 0.05)',
       stroke: '#ffffff',
       strokeWidth: 1,
       left: -15,
@@ -302,7 +324,7 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
     const platform = new window.fabric.Rect({
       width: 70,
       height: 50,
-      fill: 'transparent',
+      fill: 'rgba(255, 255, 255, 0.05)',
       stroke: '#ffffff',
       strokeWidth: 1,
       left: -35,
@@ -344,7 +366,7 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
     const roundTable = new window.fabric.Ellipse({
       rx: 22,
       ry: 18,
-      fill: 'transparent',
+      fill: 'rgba(255, 255, 255, 0.05)',
       stroke: '#ffffff',
       strokeWidth: 1,
       left: -22,
@@ -545,6 +567,22 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
                   onChange={(e) => setForm({ ...form, Package_Name: e.target.value })}
                   style={{ width: '100%', padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '15px' }}
                 />
+              </div>
+              
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: '#374151' }}>Event Type</label>
+                <select
+                  value={form.event_id}
+                  onChange={(e) => setForm({ ...form, event_id: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '15px' }}
+                >
+                  <option value="">Select Event Type</option>
+                  {eventTypes.map(event => (
+                    <option key={event.event_id} value={event.event_id}>
+                      {event.event_type}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>

@@ -2,7 +2,7 @@
 const mysql = require("mysql2/promise");
 
 const dbHosts = [
-    { host: "localhost", db: "eventdb",    user: "root", pass: "" }
+    { host: "localhost", db: "eventiquedb", user: "root", pass: "" }
 ];
 
 async function connectDB() {

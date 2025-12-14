@@ -44,6 +44,12 @@ export default function DesignerPackages() {
 		setLightboxPhoto(null);
 	};
 
+	const handleLogout = () => {
+		sessionStorage.removeItem("user");
+		sessionStorage.removeItem("token");
+		navigate("/login", { replace: true });
+	};
+
 	useEffect(() => {
 		// Role check
 		const raw = sessionStorage.getItem("user");
@@ -55,7 +61,7 @@ export default function DesignerPackages() {
 			const user = JSON.parse(raw);
 			const role = (user.role || user.Role || "").toString().toLowerCase();
 			if (role !== "designer") {
-				navigate("/customer-home", { replace: true });
+				navigate("/login", { replace: true });
 				return;
 			}
 		} catch {
@@ -121,7 +127,7 @@ export default function DesignerPackages() {
 	return (
 		<div className="dp-root">
 			{/* Sidebar copied from DesignerQueries */}
-			<DesignerSidebar />
+			<DesignerSidebar onLogout={handleLogout} />
 
 			<main className="dp-main">
 				<div className="dp-messenger">

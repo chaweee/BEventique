@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import AdminSidebar from "./AdminSidebar";
 import AdminContentHeader from "./AdminContentHeader";
+import { PaymentStatusChart, QueryMessageChart, BookingStatusBarChart } from "./AdminCharts";
 import "./AdminDashboard.css";
 
 export default function AdminDashboardPage() {
@@ -9,7 +10,9 @@ export default function AdminDashboardPage() {
     total_accounts: 0, 
     total_customers: 0, 
     revenue: 0, 
-    status_distribution: [] 
+    status_distribution: [],
+    payments: [],
+    queries: []
   });
 
   useEffect(() => {
@@ -20,7 +23,18 @@ export default function AdminDashboardPage() {
     try {
       const res = await fetch("http://localhost:3001/api/admin/stats");
       const data = await res.json();
-      if (data.status === "success") setStats(data.stats);
+      if (data.status === "success") {
+        // Fetch payments and queries for charts
+        const paymentsRes = await fetch("http://localhost:3001/api/admin/payments");
+        const paymentsData = await paymentsRes.json();
+        const queriesRes = await fetch("http://localhost:3001/api/queries/all");
+        const queriesData = await queriesRes.json();
+        setStats({
+          ...data.stats,
+          payments: paymentsData.status === "success" ? paymentsData.payments : [],
+          queries: queriesData.status === "success" ? queriesData.threads : []
+        });
+      }
     } catch (err) { console.error(err); }
   };
 
@@ -65,24 +79,19 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          <div className="status-distribution">
-            <h3>Booking Status Distribution</h3>
-            {["pending", "confirmed", "completed", "cancelled"].map((status) => (
-              <div key={status} className="status-bar">
-                <div className="status-label">
-                  <span style={{ textTransform: "capitalize" }}>{status}</span>
-                  <span>{getStatusCount(status)} ({getStatusPercentage(status)}%)</span>
-                </div>
-                <div className="status-bar-container">
-                  <div 
-                    className={`status-bar-fill ${status}`}
-                    style={{ width: `${getStatusPercentage(status)}%` }}
-                  >
-                    {getStatusPercentage(status) > 5 && `${getStatusPercentage(status)}%`}
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="dashboard-charts" style={{ display: 'flex', flexWrap: 'wrap', gap: 32, marginTop: 32 }}>
+            <div style={{ flex: 1, minWidth: 320, background: '#fff', borderRadius: 12, boxShadow: '0 2px 8px #0001', padding: 24 }}>
+              <h4 style={{ marginBottom: 12 }}>Payment Status</h4>
+              <PaymentStatusChart payments={stats.payments} />
+            </div>
+            <div style={{ flex: 1, minWidth: 320, background: '#fff', borderRadius: 12, boxShadow: '0 2px 8px #0001', padding: 24 }}>
+              <h4 style={{ marginBottom: 12 }}>Query Messages</h4>
+              <QueryMessageChart threads={stats.queries} />
+            </div>
+            <div style={{ flex: 2, minWidth: 400, background: '#fff', borderRadius: 12, boxShadow: '0 2px 8px #0001', padding: 24 }}>
+              <h4 style={{ marginBottom: 12 }}>Booking Status Distribution</h4>
+              <BookingStatusBarChart statusDistribution={stats.status_distribution} />
+            </div>
           </div>
         </div>
       </main>

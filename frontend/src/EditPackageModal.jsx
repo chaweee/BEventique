@@ -22,9 +22,11 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
     NumTent: 0,
     NumPlatform: 0,
     Package_Amount: "",
+    event_id: "",
   };
 
   const [form, setForm] = useState(emptyForm);
+  const [eventTypes, setEventTypes] = useState([]);
 
   const [files, setFiles] = useState([]); // array of {file, preview}
   const [deletedPhotos, setDeletedPhotos] = useState([]); // track deleted existing photos
@@ -32,6 +34,7 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
   const canvasContainerRef = useRef(null);
   const fabricCanvasRef = useRef(null);
   const [canvasData, setCanvasData] = useState(null);
+  const [canvasReady, setCanvasReady] = useState(false);
   const [itemCounts, setItemCounts] = useState({
     tables: 0,
     roundTables: 0,
@@ -71,6 +74,16 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
     let mounted = true;
     setLoading(true);
     setError("");
+    
+    // Fetch event types
+    fetch("http://localhost:3001/api/packages/event-types")
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === "success" && mounted) {
+          setEventTypes(data.events || []);
+        }
+      })
+      .catch(err => console.error("Failed to fetch event types:", err));
 
     fetch(`http://localhost:3001/api/packages/${encodeURIComponent(packageId)}`)
       .then(async (r) => {
@@ -102,7 +115,8 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
             NumChairs: p.NumChairs || 0,
             NumTent: p.NumTent || 0,
             NumPlatform: p.NumPlatform || 0,
-            Package_Amount: p.Package_Amount || ""
+            Package_Amount: p.Package_Amount || "",
+            event_id: p.event_id || ""
           });
 
           // Set platform checkbox
@@ -136,10 +150,17 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
           console.log("Loaded photos:", photoFiles);
 
           // Load canvas layout if it exists
-          console.log("Canvas layout from database:", p.canvas_layout);
+          console.log("RAW canvas_layout from server:", p.canvas_layout);
+          console.log("Type of canvas_layout:", typeof p.canvas_layout);
+          console.log("Is string?", typeof p.canvas_layout === 'string');
+          console.log("Is object?", typeof p.canvas_layout === 'object');
+          
           if (p.canvas_layout) {
             try {
-              const parsedLayout = JSON.parse(p.canvas_layout);
+              // If it's already an object, use it directly
+              const parsedLayout = typeof p.canvas_layout === 'string' 
+                ? JSON.parse(p.canvas_layout) 
+                : p.canvas_layout;
               console.log("Parsed canvas layout successfully:", parsedLayout);
               setCanvasData(parsedLayout);
             } catch (e) {
@@ -180,15 +201,9 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
       setError("");
       if (fabricCanvasRef.current) {
         try {
-          const wrapperEl = fabricCanvasRef.current.__wrapperEl;
-          const ce = fabricCanvasRef.current.__canvasEl;
-          const sync = fabricCanvasRef.current.__syncPosition;
           fabricCanvasRef.current.dispose();
-          if (ce && ce.parentNode) ce.parentNode.removeChild(ce);
-          if (wrapperEl && wrapperEl.parentNode) wrapperEl.parentNode.removeChild(wrapperEl);
-          if (sync) {
-            window.removeEventListener('resize', sync);
-            window.removeEventListener('scroll', sync);
+          if (canvasContainerRef.current) {
+            canvasContainerRef.current.innerHTML = '';
           }
         } catch (err) {
           console.warn('Error disposing canvas (EditPackageModal cleanup):', err?.message || err);
@@ -196,6 +211,7 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
         fabricCanvasRef.current = null;
       }
       setCanvasData(null);
+      setCanvasReady(false);
       setItemCounts({
         tables: 0,
         roundTables: 0,
@@ -210,79 +226,106 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
 
   // Initialize Fabric canvas when modal opens and loading is complete
   useEffect(() => {
-    if (isOpen && !loading && canvasContainerRef.current && !fabricCanvasRef.current) {
-      // Small delay to ensure DOM is fully rendered after loading completes
-      const timer = setTimeout(() => {
-        if (!canvasContainerRef.current) return;
-        const container = canvasContainerRef.current;
-        if (!container) return;
-        
-        const containerWidth = container.clientWidth;
-        const containerHeight = container.clientHeight;
-        
-        const wrapper = document.createElement('div');
-        wrapper.style.position = 'absolute';
-        const rect = container.getBoundingClientRect();
-        wrapper.style.left = rect.left + window.scrollX + 'px';
-        wrapper.style.top = rect.top + window.scrollY + 'px';
-        wrapper.style.width = containerWidth + 'px';
-        wrapper.style.height = containerHeight + 'px';
-        wrapper.style.overflow = 'hidden';
-        wrapper.style.pointerEvents = 'none';
-        wrapper.style.zIndex = '1000';
-        document.body.appendChild(wrapper);
+    if (!isOpen || loading) return;
+    
+    // Load Fabric.js if not already loaded
+    if (!window.fabric) {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js';
+      script.onload = () => {
+        console.log('Fabric.js loaded (EditPackageModal)');
+        setTimeout(initializeCanvas, 100);
+      };
+      document.head.appendChild(script);
+    } else {
+      setTimeout(initializeCanvas, 100);
+    }
+    
+    function initializeCanvas() {
+      if (!canvasContainerRef.current || fabricCanvasRef.current) {
+        console.log('Canvas init skipped (EditPackageModal):', { hasContainer: !!canvasContainerRef.current, hasCanvas: !!fabricCanvasRef.current });
+        return;
+      }
+      
+      const container = canvasContainerRef.current;
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+      
+      console.log('Initializing canvas (EditPackageModal) with dimensions:', { containerWidth, containerHeight });
+      
+      if (containerWidth === 0 || containerHeight === 0) {
+        console.error('Container has no dimensions, retrying...');
+        setTimeout(initializeCanvas, 200);
+        return;
+      }
 
-        const canvasEl = document.createElement('canvas');
-        canvasEl.style.display = 'block';
-        canvasEl.width = containerWidth;
-        canvasEl.height = containerHeight;
-        wrapper.appendChild(canvasEl);
+      // Clear container
+      container.innerHTML = '';
+      
+      const canvasEl = document.createElement('canvas');
+      canvasEl.style.display = 'block';
+      canvasEl.width = containerWidth;
+      canvasEl.height = containerHeight;
+      container.appendChild(canvasEl);
 
-        const canvas = new window.fabric.Canvas(canvasEl, {
-          width: containerWidth,
-          height: containerHeight,
-          backgroundColor: '#1f2937',
-          uniformScaling: true,
-        });
-        canvas.__canvasEl = canvasEl;
-        canvas.__wrapperEl = wrapper;
-        fabricCanvasRef.current = canvas;
+      const canvas = new window.fabric.Canvas(canvasEl, {
+        width: containerWidth,
+        height: containerHeight,
+        backgroundColor: '#1f2937',
+        uniformScaling: true,
+      });
+      
+      console.log('Canvas created successfully (EditPackageModal)');
+      
+      canvas.subTargetCheck = true;
+      canvas.perPixelTargetFind = true;
+      fabricCanvasRef.current = canvas;
+      setCanvasReady(true);
 
-        // Update canvas data on any change
-        canvas.on('object:modified', () => {
-          setCanvasData(canvas.toJSON());
-        });
-        canvas.on('object:added', () => {
-          setCanvasData(canvas.toJSON());
-        });
-        canvas.on('object:removed', () => {
-          setCanvasData(canvas.toJSON());
-        });
+      // Update canvas data on any change
+      canvas.on('object:modified', () => {
+        setCanvasData(canvas.toJSON());
+      });
+      canvas.on('object:added', () => {
+        setCanvasData(canvas.toJSON());
+      });
+      canvas.on('object:removed', () => {
+        setCanvasData(canvas.toJSON());
+      });
+    }
+  }, [isOpen, loading, updateItemCounts]);
 
-        // sync wrapper position
-        const syncPosition = () => {
-          const r = container.getBoundingClientRect();
-          wrapper.style.left = r.left + window.scrollX + 'px';
-          wrapper.style.top = r.top + window.scrollY + 'px';
-          wrapper.style.width = r.width + 'px';
-          wrapper.style.height = r.height + 'px';
-        };
-        window.addEventListener('resize', syncPosition);
-        window.addEventListener('scroll', syncPosition);
-        canvas.__syncPosition = syncPosition;
-        
-        // Load existing canvas data if available
-        if (canvasData) {
-          canvas.loadFromJSON(canvasData, () => {
-            canvas.renderAll();
-            updateItemCounts();
+  // Load canvas data when it becomes available (after package fetch completes)
+  useEffect(() => {
+    console.log('Load canvas effect triggered:', { canvasReady, hasData: !!canvasData });
+    
+    if (!canvasReady || !canvasData || !fabricCanvasRef.current) {
+      console.log('Skipping canvas load - canvas not ready or no data');
+      return;
+    }
+    
+    console.log('Loading canvas data into canvas:', canvasData);
+    fabricCanvasRef.current.loadFromJSON(canvasData, () => {
+      if (!fabricCanvasRef.current) return;
+      
+      const canvas = fabricCanvasRef.current;
+      
+      // Update transparent fills to semi-transparent for clickability
+      canvas.getObjects().forEach(obj => {
+        if (obj.type === 'group') {
+          obj.forEachObject((child) => {
+            if (child.fill === 'transparent') {
+              child.set('fill', 'rgba(255, 255, 255, 0.05)');
+            }
           });
         }
-      }, 50);
+      });
       
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, loading, canvasData, updateItemCounts]);
+      canvas.renderAll();
+      updateItemCounts();
+      console.log('Canvas data loaded and configured');
+    });
+  }, [canvasReady, canvasData, updateItemCounts]);
 
   // Add objects to canvas with specified shapes and semi-transparent labels
   const addTable = () => {
@@ -295,17 +338,19 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
     const table = new window.fabric.Rect({
       width: 50,
       height: 40,
-      fill: 'transparent',
+      fill: 'rgba(255, 255, 255, 0.05)',
       stroke: '#ffffff',
       strokeWidth: 1,
       left: -25,
       top: -20,
+      selectable: false // child should not be selectable
     });
     const text = new window.fabric.Text('Table', {
       fontSize: 9,
       fill: 'rgba(255, 255, 255, 0.5)',
       left: -12,
       top: -5,
+      selectable: false
     });
     const group = new window.fabric.Group([table, text], {
       left: 100,
@@ -315,13 +360,13 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
       lockSkewingY: true,
       hasControls: true,
       hasBorders: true,
+      selectable: true,
+      evented: true,
+      objectCaching: false
     });
-    // ensure group handles selection (children shouldn't intercept pointer events)
-    try {
-      group.getObjects().forEach(o => o.selectable = false);
-    } catch (e) {}
     group.itemType = 'tables';
     fabricCanvasRef.current.add(group);
+    fabricCanvasRef.current.setActiveObject(group); // Make it selected after adding
     updateItemCounts();
   };
   
@@ -334,17 +379,19 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
     }
     const chair = new window.fabric.Circle({
       radius: 15,
-      fill: 'transparent',
+      fill: 'rgba(255, 255, 255, 0.05)',
       stroke: '#ffffff',
       strokeWidth: 1,
       left: -15,
       top: -15,
+      selectable: false
     });
     const text = new window.fabric.Text('Chair', {
       fontSize: 8,
       fill: 'rgba(255, 255, 255, 0.5)',
       left: -10,
       top: -4,
+      selectable: false
     });
     const group = new window.fabric.Group([chair, text], {
       left: 150,
@@ -354,10 +401,13 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
       lockSkewingY: true,
       hasControls: true,
       hasBorders: true,
+      selectable: true,
+      evented: true,
+      objectCaching: false
     });
-    try { group.getObjects().forEach(o => o.selectable = false); } catch (e) {}
     group.itemType = 'chairs';
     fabricCanvasRef.current.add(group);
+    fabricCanvasRef.current.setActiveObject(group);
     updateItemCounts();
   };
   
@@ -376,12 +426,14 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
       strokeWidth: 1,
       left: -30,
       top: -17.5,
+      selectable: false
     });
     const text = new window.fabric.Text('Tent', {
       fontSize: 7,
       fill: 'rgba(255, 255, 255, 0.5)',
       left: -8,
       top: -5,
+      selectable: false
     });
     const group = new window.fabric.Group([tent, text], {
       left: 200,
@@ -391,10 +443,13 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
       lockSkewingY: true,
       hasControls: true,
       hasBorders: true,
+      selectable: true,
+      evented: true,
+      objectCaching: false
     });
-    try { group.getObjects().forEach(o => o.selectable = false); } catch (e) {}
     group.itemType = 'tents';
     fabricCanvasRef.current.add(group);
+    fabricCanvasRef.current.setActiveObject(group);
     updateItemCounts();
   };
   
@@ -408,17 +463,19 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
     const platform = new window.fabric.Rect({
       width: 70,
       height: 50,
-      fill: 'transparent',
+      fill: 'rgba(255, 255, 255, 0.05)',
       stroke: '#ffffff',
       strokeWidth: 1,
       left: -35,
       top: -25,
+      selectable: false
     });
     const text = new window.fabric.Text('Platform', {
       fontSize: 8,
       fill: 'rgba(255, 255, 255, 0.5)',
       left: -16,
       top: -4,
+      selectable: false
     });
     const group = new window.fabric.Group([platform, text], {
       left: 250,
@@ -428,10 +485,13 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
       lockSkewingY: true,
       hasControls: true,
       hasBorders: true,
+      selectable: true,
+      evented: true,
+      objectCaching: false
     });
-    try { group.getObjects().forEach(o => o.selectable = false); } catch (e) {}
     group.itemType = 'platforms';
     fabricCanvasRef.current.add(group);
+    fabricCanvasRef.current.setActiveObject(group);
     updateItemCounts();
   };
   
@@ -445,11 +505,12 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
     const roundTable = new window.fabric.Ellipse({
       rx: 22,
       ry: 18,
-      fill: 'transparent',
+      fill: 'rgba(255, 255, 255, 0.05)',
       stroke: '#ffffff',
       strokeWidth: 1,
       left: -22,
       top: -18,
+      selectable: false
     });
     const text = new window.fabric.Text('Round\nTable', {
       fontSize: 7,
@@ -457,6 +518,7 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
       left: -14,
       top: -8,
       textAlign: 'center',
+      selectable: false
     });
     const group = new window.fabric.Group([roundTable, text], {
       left: 180,
@@ -466,10 +528,13 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
       lockSkewingY: true,
       hasControls: true,
       hasBorders: true,
+      selectable: true,
+      evented: true,
+      objectCaching: false
     });
-    try { group.getObjects().forEach(o => o.selectable = false); } catch (e) {}
     group.itemType = 'roundTables';
     fabricCanvasRef.current.add(group);
+    fabricCanvasRef.current.setActiveObject(group);
     updateItemCounts();
   };
   
@@ -673,6 +738,22 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
                   onChange={(e) => setForm({ ...form, Package_Name: e.target.value })}
                   style={{ width: '100%', padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '15px' }}
                 />
+              </div>
+              
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: '#374151' }}>Event Type</label>
+                <select
+                  value={form.event_id}
+                  onChange={(e) => setForm({ ...form, event_id: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '15px' }}
+                >
+                  <option value="">Select Event Type</option>
+                  {eventTypes.map(event => (
+                    <option key={event.event_id} value={event.event_id}>
+                      {event.event_type}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>

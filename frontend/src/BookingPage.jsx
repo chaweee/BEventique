@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import CoolButton from "./CoolButton";
 import "./BookingPage.css";
+import "./Signup.css";
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { PickersDay } from '@mui/x-date-pickers/PickersDay';
+import { TimePicker } from '@mui/x-date-pickers/TimePicker';
+import { Tooltip } from '@mui/material';
+import dayjs from 'dayjs';
 
 export default function BookingPage() {
   const navigate = useNavigate();
@@ -19,6 +28,9 @@ export default function BookingPage() {
 
   // Canvas customization state
   const [allowCustomization, setAllowCustomization] = useState(false);
+  
+  // Booked dates state
+  const [bookedDates, setBookedDates] = useState([]);
 
   // Booking preview state
   const [bookingPreview, setBookingPreview] = useState(null);
@@ -26,6 +38,17 @@ export default function BookingPage() {
   const previewCanvasRef = useRef(null);
   const previewFabricRef = useRef(null);
   const receiptRef = useRef(null);
+  
+  // Success modal state
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  // Feedback modal state
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackRate, setFeedbackRate] = useState(0);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+  const [feedbackError, setFeedbackError] = useState("");
 
   // Get user info
   const getCustomerId = () => {
@@ -39,6 +62,22 @@ export default function BookingPage() {
       navigate("/customer-packages");
     }
   }, [packageData, navigate]);
+
+  // Fetch booked dates on component mount
+  useEffect(() => {
+    const fetchBookedDates = async () => {
+      try {
+        const response = await fetch("http://localhost:3001/api/bookings/booked-dates");
+        const data = await response.json();
+        if (data.status === "success") {
+          setBookedDates(data.booked_dates);
+        }
+      } catch (error) {
+        console.error("Error fetching booked dates:", error);
+      }
+    };
+    fetchBookedDates();
+  }, []);
 
   // Load Fabric.js from CDN
   useEffect(() => {
@@ -532,6 +571,7 @@ export default function BookingPage() {
       const bookingData = {
         customer_id: customerId,
         package_id: packageData.Package_ID || packageData.id,
+        event_type: packageData.Event_Type || packageData.EventType || packageData.Event || packageData.Type || null,
         event_date: bookingForm.event_date,
         event_time: bookingForm.event_time,
         location: bookingForm.location.trim(),
@@ -559,7 +599,7 @@ export default function BookingPage() {
       console.log("Booking creation result:", result);
 
       if (result.status === "success") {
-        // Show preview instead of immediate confirmation
+        // Store receipt data
         setBookingReceipt({
           booking_id: result.booking_id,
           ...bookingData,
@@ -573,7 +613,9 @@ export default function BookingPage() {
           designer_id: packageData.Designer_ID || packageData.designer_id
         });
         console.log("Set booking receipt - customer_name:", result.customer_name, "phone:", result.customer_phone);
-        setBookingPreview(true);
+        
+        // Show success message first
+        setShowSuccess(true);
       } else {
         alert("Error: " + (result.message || "Failed to submit booking"));
       }
@@ -644,6 +686,71 @@ export default function BookingPage() {
     }
   };
 
+  // Feedback submit handler
+  const handleSubmitFeedback = async () => {
+    setFeedbackSubmitting(true);
+    setFeedbackError("");
+    try {
+      const customerId = getCustomerId();
+      if (!customerId) {
+        setFeedbackError("User not found. Please log in again.");
+        setFeedbackSubmitting(false);
+        return;
+      }
+      if (!feedbackText.trim()) {
+        setFeedbackError("Please enter your feedback.");
+        setFeedbackSubmitting(false);
+        return;
+      }
+      if (!feedbackRate) {
+        setFeedbackError("Please select a rating.");
+        setFeedbackSubmitting(false);
+        return;
+      }
+      // Try both possible endpoints for compatibility
+      let res = await fetch("http://localhost:3001/api/feedback/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          Account_ID: customerId,
+          feedback: feedbackText,
+          rate: feedbackRate
+        })
+      });
+      let json;
+      try {
+        json = await res.json();
+      } catch {
+        json = {};
+      }
+      // If endpoint not found or error, try /api/feedback (legacy)
+      if (!res.ok || json.status !== "success") {
+        res = await fetch("http://localhost:3001/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            Account_ID: customerId,
+            feedback: feedbackText,
+            rate: feedbackRate
+          })
+        });
+        try {
+          json = await res.json();
+        } catch {
+          json = {};
+        }
+      }
+      if (json.status === "success") {
+        setFeedbackSuccess(true);
+      } else {
+        setFeedbackError(json.message || "Failed to submit feedback.");
+      }
+    } catch (err) {
+      setFeedbackError("Failed to submit feedback.");
+    }
+    setFeedbackSubmitting(false);
+  };
+
   if (!packageData) {
     return null;
   }
@@ -661,7 +768,7 @@ export default function BookingPage() {
         <main className="bp-main">
           <div className="bp-preview-container" style={{display: 'flex', gap: '24px', alignItems: 'flex-start', justifyContent: 'center'}}>
             {/* Left: Receipt */}
-            <div className="bp-preview-card" style={{flex: '0 0 38%', padding: '24px'}}>
+            <div className="bp-preview-card" style={{flex: '0 0 50%', padding: '24px'}}>
               <div className="bp-preview-header">
                 <h1>✓ Booking Confirmed!</h1>
                 <p>Your booking has been successfully submitted.</p>
@@ -674,7 +781,7 @@ export default function BookingPage() {
 
                 {/* Professional Header */}
                 <div style={{textAlign: 'center', marginBottom: '24px', borderBottom: '2px solid #1f2937', paddingBottom: '16px'}}>
-                  <h2 style={{margin: '0 0 4px 0', fontSize: '28px', fontWeight: '700', color: '#1f2937'}}>EVENTIQUE</h2>
+                  <h2 style={{margin: '0 0 4px 0', fontSize: '28px', fontWeight: '700', color: '#1f2937'}}>Baby's Eventique</h2>
                   <p style={{margin: 0, color: '#6b7280', fontSize: '14px'}}>Event Planning & Design Services</p>
                 </div>
 
@@ -774,27 +881,160 @@ export default function BookingPage() {
                 </div>
               </div>
 
-              <div style={{display:'flex', gap:'8px', marginTop:'12px'}}>
+              <div style={{display:'flex', gap:'8px', marginTop:'12px', justifyContent:'space-between'}}>
                 <button className="bp-receipt-btn" onClick={handleDownloadReceiptImage}>🖼️ Download Receipt (JPEG)</button>
-              </div>
-
-              <div style={{marginTop:12}}>
                 <button className="bp-home-btn" onClick={() => navigate('/bookings')}>View My Bookings</button>
+              </div>
+              {/* Feedback Button */}
+              <div style={{marginTop: '24px', textAlign: 'center'}}>
+                <button
+                  style={{
+                    background: '#f59e42',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '12px 32px',
+                    fontWeight: 600,
+                    fontSize: '17px',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px #f59e4222',
+                    transition: 'background 0.2s'
+                  }}
+                  onClick={() => setShowFeedback(true)}
+                >
+                  Leave Feedback
+                </button>
               </div>
             </div>
 
             {/* Right: Final layout canvas */}
-            <div style={{flex: '0 0 62%', padding: '24px', backgroundColor: '#f9fafb', borderRadius: '8px'}}>
+            <div style={{flex: '0 0 60%', padding: '24px', backgroundColor: '#f9fafb', borderRadius: '8px'}}>
               <h3 style={{fontSize: '24px', marginBottom: '16px', color: '#1f2937'}}>Final Layout</h3>
-              <div style={{height: '800px', position: 'relative', borderRadius: 8, overflow: 'hidden', backgroundColor: '#fff'}}>
+              <div style={{height: '800px', position: 'relative', borderRadius: 8, backgroundColor: '#fff'}}>
                 <div ref={previewCanvasRef} style={{width: '100%', height: '100%'}} />
               </div>
-              <div style={{display:'flex', gap:8, marginTop:16}}>
+              <div style={{display: 'flex', justifyContent: 'center', marginTop: '16px'}}>
                 <button className="bp-receipt-btn" onClick={handleDownloadLayoutImage}>💾 Download Layout (JPEG)</button>
               </div>
             </div>
           </div>
         </main>
+        {/* Feedback Modal */}
+        {showFeedback && (
+          <div className="modal-backdrop" style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <div className="modal-card" style={{
+              background: '#fff8f1',
+              borderRadius: '16px',
+              padding: '36px 32px 28px 32px',
+              minWidth: '350px',
+              maxWidth: '95vw',
+              boxShadow: '0 8px 32px #0002',
+              position: 'relative',
+              border: '2px solid #a0522d'
+            }}>
+              <button
+                style={{
+                  position: 'absolute', top: 12, right: 16, background: 'none', border: 'none', fontSize: 28, color: '#a0522d', cursor: 'pointer'
+                }}
+                onClick={() => setShowFeedback(false)}
+                aria-label="Close"
+              >×</button>
+              <h2 style={{margin: 0, fontWeight: 700, fontSize: 24, color: '#8b4513', textAlign: 'center'}}>We value your feedback!</h2>
+              <p style={{margin: '12px 0 20px 0', color: '#a0522d', textAlign: 'center'}}>How was your booking experience?</p>
+              <div style={{display: 'flex', justifyContent: 'center', marginBottom: 18}}>
+                {[1,2,3,4,5].map(star => (
+                  <span
+                    key={star}
+                    style={{
+                      fontSize: 36,
+                      color: feedbackRate >= star ? '#a0522d' : '#e5e7eb',
+                      cursor: 'pointer',
+                      transition: 'color 0.15s'
+                    }}
+                    onClick={() => setFeedbackRate(star)}
+                    onMouseOver={() => setFeedbackRate(star)}
+                    onMouseLeave={() => setFeedbackRate(feedbackRate)}
+                    role="button"
+                    aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                  >★</span>
+                ))}
+              </div>
+              <textarea
+                value={feedbackText}
+                onChange={e => setFeedbackText(e.target.value)}
+                placeholder="Share your thoughts or suggestions..."
+                rows={4}
+                style={{
+                  width: '100%',
+                  border: '1.5px solid #a0522d',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  fontSize: '15px',
+                  marginBottom: '16px',
+                  resize: 'vertical',
+                  background: '#fdf6f0',
+                  color: '#5c3310'
+                }}
+                maxLength={500}
+              />
+              {feedbackError && (
+                <div style={{color: '#b91c1c', background: '#fee2e2', borderRadius: 6, padding: '8px 12px', marginBottom: 10, fontSize: 14}}>
+                  {feedbackError}
+                </div>
+              )}
+              {feedbackSuccess ? (
+                <div style={{color: '#fff', background: '#a0522d', borderRadius: 6, padding: '10px 14px', textAlign: 'center', fontWeight: 600, fontSize: 16}}>
+                  Thank you for your feedback!
+                  <div>
+                    <button
+                      style={{
+                        marginTop: 14,
+                        background: '#8b4513',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '10px 28px',
+                        fontWeight: 600,
+                        fontSize: '15px',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => {
+                        setShowFeedback(false);
+                        setFeedbackText("");
+                        setFeedbackRate(0);
+                        setFeedbackSuccess(false);
+                      }}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  style={{
+                    background: '#a0522d',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '12px 32px',
+                    fontWeight: 600,
+                    fontSize: '17px',
+                    cursor: feedbackSubmitting ? 'not-allowed' : 'pointer',
+                    width: '100%',
+                    marginTop: 4,
+                    boxShadow: '0 2px 8px #a0522d22'
+                  }}
+                  disabled={feedbackSubmitting}
+                  onClick={handleSubmitFeedback}
+                >
+                  {feedbackSubmitting ? "Submitting..." : "Submit Feedback"}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -824,7 +1064,7 @@ export default function BookingPage() {
                   checked={allowCustomization}
                   onChange={(e) => setAllowCustomization(e.target.checked)}
                 />
-                <span>Allow me to customize the layout</span>
+                <span>Customize Layout</span>
               </label>
             </div>
 
@@ -905,6 +1145,13 @@ export default function BookingPage() {
               <h3>Booking Information</h3>
 
               <div className="bp-form-group">
+                <label>Event Type</label>
+                <p style={{ margin: 0, padding: '8px', backgroundColor: '#f5f5f5', border: '1px solid #ccc', borderRadius: '4px' }}>
+                  {packageData.Event_Type || packageData.EventType || packageData.Event || packageData.Type || "General"}
+                </p>
+              </div>
+
+              <div className="bp-form-group">
                 <label>Event Location *</label>
                 <input
                   type="text"
@@ -918,23 +1165,91 @@ export default function BookingPage() {
               <div className="bp-form-row">
                 <div className="bp-form-group">
                   <label>Event Date *</label>
-                  <input
-                    type="date"
-                    value={bookingForm.event_date}
-                    onChange={(e) => setBookingForm({...bookingForm, event_date: e.target.value})}
-                    min={new Date().toISOString().split('T')[0]}
-                    required
-                  />
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DatePicker
+                      value={bookingForm.event_date ? dayjs(bookingForm.event_date) : null}
+                      onChange={(newValue) => {
+                        setBookingForm({
+                          ...bookingForm, 
+                          event_date: newValue ? newValue.format('YYYY-MM-DD') : ''
+                        });
+                      }}
+                      minDate={dayjs()}
+                      shouldDisableDate={(date) => {
+                        const dateStr = date.format('YYYY-MM-DD');
+                        return bookedDates.includes(dateStr);
+                      }}
+                      slots={{
+                        day: (dayProps) => {
+                          const dateStr = dayProps.day.format('YYYY-MM-DD');
+                          const isBooked = bookedDates.includes(dateStr);
+                          
+                          if (isBooked) {
+                            return (
+                              <Tooltip title="This Date is Unavailable" arrow>
+                                <span>
+                                  <PickersDay 
+                                    {...dayProps} 
+                                    sx={{
+                                      backgroundColor: '#fee2e2',
+                                      color: '#991b1b',
+                                      '&:hover': {
+                                        backgroundColor: '#fecaca',
+                                      },
+                                      '&.Mui-disabled': {
+                                        backgroundColor: '#fee2e2',
+                                        color: '#991b1b',
+                                      }
+                                    }}
+                                  />
+                                </span>
+                              </Tooltip>
+                            );
+                          }
+                          return <PickersDay {...dayProps} />;
+                        }
+                      }}
+                      slotProps={{
+                        textField: {
+                          required: true,
+                          fullWidth: true,
+                          sx: {
+                            '& .MuiInputBase-root': {
+                              backgroundColor: 'white',
+                              borderRadius: '8px',
+                            }
+                          },
+                        }
+                      }}
+                    />
+                  </LocalizationProvider>
                 </div>
 
                 <div className="bp-form-group">
                   <label>Event Time *</label>
-                  <input
-                    type="time"
-                    value={bookingForm.event_time}
-                    onChange={(e) => setBookingForm({...bookingForm, event_time: e.target.value})}
-                    required
-                  />
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <TimePicker
+                      value={bookingForm.event_time ? dayjs(`2000-01-01 ${bookingForm.event_time}`) : null}
+                      onChange={(newValue) => {
+                        setBookingForm({
+                          ...bookingForm,
+                          event_time: newValue ? newValue.format('HH:mm') : ''
+                        });
+                      }}
+                      slotProps={{
+                        textField: {
+                          required: true,
+                          fullWidth: true,
+                          sx: {
+                            '& .MuiInputBase-root': {
+                              backgroundColor: 'white',
+                              borderRadius: '8px',
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  </LocalizationProvider>
                 </div>
               </div>
 
@@ -960,6 +1275,22 @@ export default function BookingPage() {
           </div>
         </div>
       </main>
+      
+      {/* Success Modal */}
+      {showSuccess && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <h3 style={{ color: '#ff4c05ef' }}>Booking Successful!</h3>
+            <p>Your booking has been created successfully.</p>
+            <CoolButton onClick={() => {
+              setShowSuccess(false);
+              setBookingPreview(true);
+            }}>
+              Continue
+            </CoolButton>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

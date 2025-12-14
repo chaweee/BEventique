@@ -1,19 +1,14 @@
 import React from "react";
 import AdminSidebar from "./AdminSidebar";
 import AdminContentHeader from "./AdminContentHeader";
-import CustomerQueries from "./CustomerQueries";
+import AdminCustomerQueries from "./AdminCustomerQueries";
 import "./AdminDashboard.css";
 
 export default function AdminCustomerQueriesPage() {
   return (
-    <div className="admin-root">
+    <div className="dq-root">
       <AdminSidebar />
-      <main className="admin-content">
-        <AdminContentHeader title="Customer Queries" />
-        <div className="content-body">
-          <CustomerQueries />
-        </div>
-      </main>
+      <AdminCustomerQueries />
     </div>
   );
 }

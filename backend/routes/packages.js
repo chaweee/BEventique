@@ -4,6 +4,23 @@ const fs = require("fs");
 const path = require("path");
 const router = express.Router();
 
+/* ===== GET EVENT TYPES ===== */
+router.get("/event-types", async (req, res) => {
+    try {
+        const [rows] = await global.db.query("SELECT event_id, event_type FROM event ORDER BY event_type");
+        return res.json({
+            status: "success",
+            events: rows
+        });
+    } catch (err) {
+        console.error("Get event types error:", err);
+        return res.status(500).json({
+            status: "error",
+            message: "Server error: " + err.message
+        });
+    }
+});
+
 /* ============================================================
    GET ALL PACKAGES  (replacement for get_package.php)
    ============================================================ */
@@ -60,7 +77,8 @@ router.post("/add", async (req, res) => {
             NumTent,
             NumPlatform,
             Package_Amount,
-            package_layout
+            package_layout,
+            event_id
         } = req.body;
 
         if (!Package_Name) {
@@ -72,8 +90,8 @@ router.post("/add", async (req, res) => {
 
         const sql = `
             INSERT INTO package 
-                (Package_Name, Description, NumTables, NumRoundTables, NumChairs, NumTent, NumPlatform, Package_Amount, Status, package_layout)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+                (Package_Name, Description, NumTables, NumRoundTables, NumChairs, NumTent, NumPlatform, Package_Amount, Status, package_layout, event_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
         `;
 
         const [result] = await global.db.query(sql, [
@@ -85,7 +103,8 @@ router.post("/add", async (req, res) => {
             parseInt(NumTent) || 0,
             parseInt(NumPlatform) || 0,
             parseFloat(Package_Amount) || 0,
-            package_layout || null
+            package_layout || null,
+            event_id || null
         ]);
 
         const packageId = result.insertId;
@@ -502,13 +521,16 @@ router.get("/:id", async (req, res) => {
             NumPlatform: pkg.NumPlatform,
             Package_Amount: pkg.Package_Amount,
             Status: pkg.Status,
+            event_id: pkg.event_id,
             canvas_layout: pkg.package_layout || pkg.canvas_layout, // Use package_layout as fallback
             photos: photoRows.map(photo => convertPhotoPath(photo.Photo)).filter(url => url && url.trim() !== ''),
             Photo: photoRows.length > 0 ? convertPhotoPath(photoRows[0].Photo) : null,
             photoDetails: photoRows // Include full photo details for debugging
         };
 
-        console.log("Formatted package data being sent:", packageData);
+        console.log("Has package_layout:", !!pkg.package_layout, "Length:", pkg.package_layout?.length);
+        console.log("Has canvas_layout:", !!pkg.canvas_layout, "Length:", pkg.canvas_layout?.length);
+        console.log("Sending canvas_layout with length:", packageData.canvas_layout?.length);
 
         return res.json({
             status: "success",

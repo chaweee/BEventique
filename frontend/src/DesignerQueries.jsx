@@ -22,7 +22,7 @@ export default function DesignerQueries() {
   // Get designer ID from session/localStorage
   const getDesignerId = () => {
     const user = JSON.parse(sessionStorage.getItem("user") || "{}");
-    return user.Account_ID || localStorage.getItem("userId");
+    return user.Account_ID || user.id || user.account_id || localStorage.getItem("userId");
   };
 
   // Fetch all query threads
@@ -30,8 +30,8 @@ export default function DesignerQueries() {
     setLoading(true);
     try {
       const url = activeFilter === "all" 
-        ? "http://localhost:3001/api/queries/all"
-        : `http://localhost:3001/api/queries/all?status=${activeFilter}`;
+        ? "http://localhost:3001/api/queries/designer"
+        : `http://localhost:3001/api/queries/designer?status=${activeFilter}`;
       
       const res = await fetch(url);
       const data = await res.json();
@@ -184,26 +184,51 @@ export default function DesignerQueries() {
     
     try {
       const designerId = getDesignerId();
+      console.log("=== SEND MESSAGE DEBUG ===");
+      console.log("Designer ID:", designerId);
+      console.log("Selected thread object:", selectedThread);
+      console.log("Thread ID:", selectedThread?.thread_id);
+      console.log("Message:", newMessage);
+      
+      if (!selectedThread?.thread_id) {
+        alert("Error: No thread selected");
+        return;
+      }
+      
+      if (!designerId) {
+        alert("Error: Designer ID not found");
+        return;
+      }
+      
+      const payload = {
+        thread_id: selectedThread.thread_id,
+        sender_id: designerId,
+        message: newMessage,
+        is_designer: true
+      };
+      
+      console.log("Sending payload:", payload);
+      
       const res = await fetch("http://localhost:3001/api/queries/message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          thread_id: selectedThread.thread_id,
-          sender_id: designerId,
-          message: newMessage,
-          is_designer: true
-        })
+        body: JSON.stringify(payload)
       });
       
       const data = await res.json();
+      console.log("Send message response:", data);
       
       if (data.status === "success") {
         setNewMessage("");
         scrollToBottom();
         // No need to manually fetch - Socket.IO will update in real-time
+      } else {
+        console.error("Failed to send message:", data.message);
+        alert("Failed to send message: " + data.message);
       }
     } catch (err) {
       console.error("Error sending message:", err);
+      alert("Error sending message. Please try again.");
     }
   };
 
@@ -224,34 +249,6 @@ export default function DesignerQueries() {
       }
     } catch (err) {
       console.error("Error updating status:", err);
-    }
-  };
-
-  // Assign thread to self
-  const handleAssignToMe = async () => {
-    try {
-      const designerId = getDesignerId();
-      const res = await fetch(`http://localhost:3001/api/queries/assign/${selectedThread.thread_id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ designer_id: designerId })
-      });
-      
-      const data = await res.json();
-      
-      if (data.status === "success") {
-        const user = JSON.parse(sessionStorage.getItem("user") || "{}");
-        setSelectedThread({
-          ...selectedThread, 
-          assigned_to: designerId,
-          designer_firstname: user.Firstname || user.FirstName,
-          designer_lastname: user.Lastname || user.LastName,
-          status: "in_progress"
-        });
-        fetchThreads();
-      }
-    } catch (err) {
-      console.error("Error assigning:", err);
     }
   };
 
@@ -339,7 +336,7 @@ export default function DesignerQueries() {
           {/* Left Sidebar - Thread List */}
           <aside className="dq-threads-sidebar">
             <div className="dq-sidebar-header">
-              <h2>Customer Queries</h2>
+              <h2>Customer Inquiries</h2>
             </div>
 
             {/* Filter Tabs (only All, In Progress, Resolved) */}
@@ -384,12 +381,29 @@ export default function DesignerQueries() {
                       {thread.last_message?.length > 50 && "..."}
                     </div>
                     <div className="thread-footer">
-                      <span 
-                        className="thread-status"
-                        style={{ backgroundColor: getStatusColor(thread.status) }}
+                      <select
+                        className={`thread-status-select${thread.status === 'in_progress' ? ' brown' : ''}`}
+                        value={thread.status}
+                        onChange={e => handleStatusChange(e.target.value)}
+                        style={{
+                          background: '#fff',
+                          border: '1px solid #e4e6eb',
+                          borderRadius: '12px',
+                          padding: '2px 8px',
+                          fontSize: '0.75rem',
+                          color: thread.status === 'in_progress' ? '#7a4a13' : '#222',
+                          fontWeight: thread.status === 'in_progress' ? 600 : 500,
+                          outline: 'none',
+                          cursor: 'pointer',
+                          minWidth: '90px',
+                          appearance: 'none',
+                        }}
+                        disabled={selectedThread?.thread_id !== thread.thread_id}
                       >
-                        {thread.status}
-                      </span>
+                        <option value="open">Open</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                      </select>
                       <span className="thread-time">{formatDate(thread.updated_at)}</span>
                     </div>
                   </div>
@@ -418,21 +432,28 @@ export default function DesignerQueries() {
                       {selectedThread.customer_email}
                     </p>
                   </div>
-                  <div className="conv-actions">
-                    {!selectedThread.assigned_to && (
-                      <button className="assign-btn" onClick={handleAssignToMe}>
-                        Assign to Me
-                      </button>
-                    )}
-                    <select 
+                  <div className="conv-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <select
+                      className={`thread-status-select${selectedThread.status === 'in_progress' ? ' brown' : ''}`}
                       value={selectedThread.status}
-                      onChange={(e) => handleStatusChange(e.target.value)}
-                      className="status-select"
+                      onChange={e => handleStatusChange(e.target.value)}
+                      style={{
+                        background: '#fff',
+                        border: '1px solid #e4e6eb',
+                        borderRadius: '12px',
+                        padding: '2px 8px',
+                        fontSize: '0.85rem',
+                        color: selectedThread.status === 'in_progress' ? '#7a4a13' : '#222',
+                        fontWeight: selectedThread.status === 'in_progress' ? 600 : 500,
+                        outline: 'none',
+                        cursor: 'pointer',
+                        minWidth: '110px',
+                        appearance: 'none',
+                      }}
                     >
                       <option value="open">Open</option>
                       <option value="in_progress">In Progress</option>
                       <option value="resolved">Resolved</option>
-                      <option value="closed">Closed</option>
                     </select>
                     <button className="dq-close-conv" onClick={closeConversation}>✕</button>
                   </div>
@@ -448,7 +469,10 @@ export default function DesignerQueries() {
                       <div className="message-bubble">
                         <div className="message-header">
                           <strong>
-                            {msg.is_designer ? `${msg.Firstname} ${msg.Lastname} (Designer)` : `${msg.Firstname} ${msg.Lastname}`}
+                            {msg.is_designer 
+                              ? `${msg.Firstname || 'Designer'} ${msg.Lastname || ''} `.trim() 
+                              : `${msg.Firstname || ''} ${msg.Lastname || ''}`.trim()
+                            }
                           </strong>
                           <span className="message-time">{formatMessageTime(msg.created_at)}</span>
                         </div>

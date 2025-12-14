@@ -50,6 +50,36 @@ router.post("/create", async (req, res) => {
 });
 
 /* ============================================================
+   CHECK MIGRATION STATUS
+   GET /api/queries/check-migration
+   ============================================================ */
+router.get("/check-migration", async (req, res) => {
+    try {
+        const [oldQueries] = await global.db.query(`
+            SELECT COUNT(*) as count FROM queries WHERE reply_to IS NULL
+        `);
+        
+        const [newThreads] = await global.db.query(`
+            SELECT COUNT(*) as count FROM design_query_threads
+        `);
+
+        return res.json({
+            status: "success",
+            old_queries: oldQueries[0]?.count || 0,
+            new_threads: newThreads[0]?.count || 0,
+            message: "Check if migration is needed"
+        });
+
+    } catch (err) {
+        console.error("Check migration error:", err);
+        return res.status(500).json({
+            status: "error",
+            message: "Server error: " + err.message
+        });
+    }
+});
+
+/* ============================================================
    GET MESSAGES FOR A QUERY
    GET /api/queries/:query_id/messages
    ============================================================ */
@@ -153,7 +183,7 @@ router.post("/:query_id/message", async (req, res) => {
 });
 
 /* ============================================================
-   GET CUSTOMER'S QUERIES (Messenger Style)
+   GET CUSTOMER'S QUERY THREADS
    GET /api/queries/customer/:customer_id
    ============================================================ */
 router.get("/customer/:customer_id", async (req, res) => {
@@ -162,55 +192,27 @@ router.get("/customer/:customer_id", async (req, res) => {
 
         const sql = `
             SELECT 
-                q.*,
-                CONCAT(a.FirstName, ' ', a.LastName) as customer_name,
-                e.event_type,
-                b.event_date,
-                p.Package_Name
-            FROM queries q
-            LEFT JOIN bookings b ON q.booking_id = b.booking_id
-            LEFT JOIN event e ON b.event_id = e.event_id
-            LEFT JOIN package p ON b.package_id = p.Package_ID
-            LEFT JOIN account a ON q.sender_id = a.Account_ID
-            WHERE q.sender_id = ? AND q.reply_to IS NULL
-            ORDER BY q.created_at DESC
-        `;
-
-        const [rows] = await global.db.query(sql, [customer_id]);
-
-        return res.json({
-            status: "success",
-            queries: rows
-        });
-
-    } catch (err) {
-        console.error("Get customer queries error:", err);
-        return res.status(500).json({
-            status: "error",
-            message: "Server error: " + err.message
-        });
-    }
-});
-
-/* ============================================================
-   GET CUSTOMER'S QUERY THREADS (Old - Keeping for reference)
-   GET /api/queries/customer/:customer_id
-   ============================================================ */
-router.get("/customer/:customer_id", async (req, res) => {
-    try {
-        const { customer_id } = req.params;
-
-        const sql = `
-            SELECT 
-                t.*,
+                t.thread_id,
+                t.customer_id,
+                t.booking_id,
+                t.subject,
+                t.status,
+                t.priority,
+                t.assigned_to,
+                t.created_at,
+                t.updated_at,
+                customer.FirstName as customer_firstname,
+                customer.LastName as customer_lastname,
+                customer.Email as customer_email,
                 (SELECT COUNT(*) FROM design_query_messages WHERE thread_id = t.thread_id) as message_count,
-                (SELECT COUNT(*) FROM design_query_messages 
-                 WHERE thread_id = t.thread_id AND is_designer = TRUE AND read_status = FALSE) as unread_count,
                 (SELECT message FROM design_query_messages WHERE thread_id = t.thread_id ORDER BY created_at DESC LIMIT 1) as last_message,
-                designer.Firstname as designer_firstname,
-                designer.Lastname as designer_lastname
+                b.event_date,
+                b.event_time,
+                e.event_type
             FROM design_query_threads t
-            LEFT JOIN account designer ON t.assigned_to = designer.Account_ID
+            LEFT JOIN account customer ON t.customer_id = customer.Account_ID
+            LEFT JOIN bookings b ON t.booking_id = b.booking_id
+            LEFT JOIN event e ON b.event_id = e.event_id
             WHERE t.customer_id = ?
             ORDER BY t.updated_at DESC
         `;
@@ -232,7 +234,7 @@ router.get("/customer/:customer_id", async (req, res) => {
 });
 
 /* ============================================================
-   GET ALL QUERY THREADS (Designer View)
+   GET ALL QUERY THREADS (Designer/Admin View)
    GET /api/queries/all?status=open
    ============================================================ */
 router.get("/all", async (req, res) => {
@@ -241,16 +243,24 @@ router.get("/all", async (req, res) => {
         
         let sql = `
             SELECT 
-                t.*,
-                customer.Firstname as customer_firstname,
-                customer.Lastname as customer_lastname,
+                t.thread_id,
+                t.customer_id,
+                t.booking_id,
+                t.subject,
+                t.status,
+                t.priority,
+                t.assigned_to,
+                t.created_at,
+                t.updated_at,
+                customer.FirstName as customer_firstname,
+                customer.LastName as customer_lastname,
                 customer.Email as customer_email,
                 (SELECT COUNT(*) FROM design_query_messages WHERE thread_id = t.thread_id) as message_count,
                 (SELECT COUNT(*) FROM design_query_messages 
                  WHERE thread_id = t.thread_id AND is_designer = FALSE AND read_status = FALSE) as unread_count,
                 (SELECT message FROM design_query_messages WHERE thread_id = t.thread_id ORDER BY created_at DESC LIMIT 1) as last_message,
-                designer.Firstname as designer_firstname,
-                designer.Lastname as designer_lastname
+                designer.FirstName as designer_firstname,
+                designer.LastName as designer_lastname
             FROM design_query_threads t
             LEFT JOIN account customer ON t.customer_id = customer.Account_ID
             LEFT JOIN account designer ON t.assigned_to = designer.Account_ID
@@ -271,6 +281,62 @@ router.get("/all", async (req, res) => {
 
     } catch (err) {
         console.error("Get all threads error:", err);
+        return res.status(500).json({
+            status: "error",
+            message: "Server error: " + err.message
+        });
+    }
+});
+
+/* ============================================================
+   GET DESIGNER-ONLY QUERIES
+   GET /api/queries/designer?status=open
+   ============================================================ */
+router.get("/designer", async (req, res) => {
+    try {
+        const { status } = req.query;
+        
+        let sql = `
+            SELECT 
+                t.thread_id,
+                t.customer_id,
+                t.booking_id,
+                t.subject,
+                t.status,
+                t.priority,
+                t.assigned_to,
+                t.created_at,
+                t.updated_at,
+                customer.FirstName as customer_firstname,
+                customer.LastName as customer_lastname,
+                customer.Email as customer_email,
+                (SELECT COUNT(*) FROM design_query_messages WHERE thread_id = t.thread_id) as message_count,
+                (SELECT COUNT(*) FROM design_query_messages 
+                 WHERE thread_id = t.thread_id AND is_designer = FALSE AND read_status = FALSE) as unread_count,
+                (SELECT message FROM design_query_messages WHERE thread_id = t.thread_id ORDER BY created_at DESC LIMIT 1) as last_message,
+                designer.FirstName as designer_firstname,
+                designer.LastName as designer_lastname
+            FROM design_query_threads t
+            LEFT JOIN account customer ON t.customer_id = customer.Account_ID
+            LEFT JOIN account designer ON t.assigned_to = designer.Account_ID
+            WHERE t.subject LIKE '%Designer%'
+        `;
+
+        if (status) {
+            sql += ` AND t.status = ?`;
+        }
+
+        sql += ` ORDER BY t.updated_at DESC`;
+
+        const [rows] = await global.db.query(sql, status ? [status] : []);
+
+        return res.json({
+            status: "success",
+            threads: rows
+        });
+
+    } catch (err) {
+        console.error("Get designer threads error:", err);
         return res.status(500).json({
             status: "error",
             message: "Server error: " + err.message
@@ -458,7 +524,7 @@ router.patch("/mark-read/:thread_id", async (req, res) => {
             WHERE thread_id = ? AND is_designer = ?
         `;
         
-        await global.db.query(sql, [thread_id, !is_designer]);
+        await global.db.query(sql, [thread_id, is_designer]);
 
         return res.json({
             status: "success",
@@ -467,6 +533,178 @@ router.patch("/mark-read/:thread_id", async (req, res) => {
 
     } catch (err) {
         console.error("Mark read error:", err);
+        return res.status(500).json({
+            status: "error",
+            message: "Server error: " + err.message
+        });
+    }
+});
+
+/* ============================================================
+   MIGRATE OLD QUERIES TO NEW THREADS (One-time migration)
+   POST /api/queries/migrate
+   ============================================================ */
+router.post("/migrate", async (req, res) => {
+    try {
+        // Get all root queries (reply_to IS NULL) from old queries table
+        const [oldQueries] = await global.db.query(`
+            SELECT DISTINCT 
+                q.query_id,
+                q.sender_id,
+                q.booking_id,
+                q.created_at,
+                COALESCE(b.customer_id, q.sender_id) as customer_id,
+                'customer query' as subject
+            FROM queries q
+            LEFT JOIN bookings b ON q.booking_id = b.booking_id
+            WHERE q.reply_to IS NULL
+        `);
+
+        let migratedCount = 0;
+
+        for (const oldQuery of oldQueries) {
+            try {
+                // Create thread
+                const [threadResult] = await global.db.query(`
+                    INSERT INTO design_query_threads 
+                    (customer_id, booking_id, subject, status, created_at, updated_at)
+                    VALUES (?, ?, ?, 'open', ?, ?)
+                `, [
+                    oldQuery.customer_id,
+                    oldQuery.booking_id,
+                    oldQuery.subject,
+                    oldQuery.created_at,
+                    oldQuery.created_at
+                ]);
+
+                const threadId = threadResult.insertId;
+
+                // Get all messages for this query (root + replies)
+                const [allMessages] = await global.db.query(`
+                    SELECT * FROM queries
+                    WHERE query_id = ? OR reply_to = ?
+                    ORDER BY created_at ASC
+                `, [oldQuery.query_id, oldQuery.query_id]);
+
+                // Migrate messages to new table
+                for (const msg of allMessages) {
+                    await global.db.query(`
+                        INSERT INTO design_query_messages
+                        (thread_id, sender_id, message, is_designer, created_at)
+                        VALUES (?, ?, ?, 0, ?)
+                    `, [threadId, msg.sender_id, msg.message, msg.created_at]);
+                }
+
+                migratedCount++;
+            } catch (innerErr) {
+                console.error(`Error migrating query ${oldQuery.query_id}:`, innerErr.message);
+            }
+        }
+
+        return res.json({
+            status: "success",
+            message: `Migrated ${migratedCount} queries to new system`
+        });
+
+    } catch (err) {
+        console.error("Migration error:", err);
+        return res.status(500).json({
+            status: "error",
+            message: "Server error: " + err.message
+        });
+    }
+});
+
+/* ============================================================
+   CREATE NEW QUERY THREAD (Customer)
+   POST /api/queries/create-thread
+   ============================================================ */
+router.post("/create-thread", async (req, res) => {
+    try {
+        const { customer_id, booking_id, subject, message, recipient_type } = req.body;
+
+        if (!customer_id || !booking_id || !subject || !message) {
+            return res.status(400).json({
+                status: "error",
+                message: "customer_id, booking_id, subject, and message are required"
+            });
+        }
+
+        // Determine initial status and priority based on recipient type
+        const initialStatus = "open";
+        const priority = recipient_type === "designer" ? "high" : "medium";
+        
+        // For designer queries, try to auto-assign if there's an available designer
+        let assignedDesigner = null;
+        if (recipient_type === "designer") {
+            // Get available designers (you can customize this logic)
+            const [designers] = await global.db.query(`
+                SELECT Account_ID 
+                FROM account 
+                WHERE Role = 'designer' 
+                LIMIT 1
+            `);
+            
+            if (designers.length > 0) {
+                assignedDesigner = designers[0].Account_ID;
+            }
+        }
+
+        // Create new thread with recipient info in subject
+        const [threadResult] = await global.db.query(`
+            INSERT INTO design_query_threads 
+            (customer_id, booking_id, subject, status, priority, assigned_to, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+        `, [
+            customer_id, 
+            booking_id, 
+            subject, 
+            initialStatus, 
+            priority,
+            assignedDesigner
+        ]);
+
+        const threadId = threadResult.insertId;
+
+        // Insert first message
+        await global.db.query(`
+            INSERT INTO design_query_messages
+            (thread_id, sender_id, message, is_designer, created_at)
+            VALUES (?, ?, ?, 0, NOW())
+        `, [threadId, customer_id, message]);
+
+        // Emit real-time event to notify admin/designers
+        if (global.io) {
+            global.io.emit("thread_updated", { 
+                thread_id: threadId,
+                recipient_type: recipient_type,
+                priority: priority
+            });
+            
+            // Send specific notification based on recipient
+            if (recipient_type === "designer") {
+                global.io.emit("designer_new_query", {
+                    thread_id: threadId,
+                    customer_id: customer_id,
+                    priority: "high"
+                });
+            } else {
+                global.io.emit("admin_new_query", {
+                    thread_id: threadId,
+                    customer_id: customer_id
+                });
+            }
+        }
+
+        return res.status(201).json({
+            status: "success",
+            message: "Query created successfully",
+            thread_id: threadId,
+            recipient_type: recipient_type
+        });
+
+    } catch (err) {
+        console.error("Create thread error:", err);
         return res.status(500).json({
             status: "error",
             message: "Server error: " + err.message

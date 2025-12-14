@@ -23,7 +23,7 @@ export default function CustomerHome() {
             <button className="ch-link" onClick={() => navigate("/customer-home")}>HOME</button>
             <button className="ch-link" onClick={() => navigate("/customer-packages")}>PACKAGES</button>
             <button className="ch-link" onClick={() => navigate("/bookings")}>MANAGE BOOKINGS</button>
-            <button className="ch-link" onClick={() => navigate("/design-queries")}>DESIGN QUERIES</button>
+            <button className="ch-link" onClick={() => navigate("/design-queries")}>CUSTOMER INQUIRIES</button>
             <div
               className="ch-link ch-logout"
               role="button"

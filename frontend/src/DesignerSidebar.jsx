@@ -1,55 +1,49 @@
 import React from 'react';
-import { Sidebar, Menu, MenuItem } from 'react-mui-sidebar';
-import ViewCarouselIcon from '@mui/icons-material/ViewCarousel';
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
-import LogoutIcon from '@mui/icons-material/Logout';
-import { useLocation, useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Package, MessageSquare, LogOut } from 'lucide-react';
 import './DesignerSidebar.css';
 
 /* DesignerSidebar: shared sidebar for designer pages */
-export default function DesignerSidebar() {
+export default function DesignerSidebar({ onLogout }) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isPackages = location.pathname.includes('designer-packages');
-  const isQueries = location.pathname.includes('designer-queries');
-
   const handleLogout = () => {
-    sessionStorage.removeItem('user');
-    navigate('/login');
+    sessionStorage.clear();
+    localStorage.clear();
+    navigate('/login', { replace: true });
+  };
+
+  const isActive = (path) => {
+    return location.pathname.includes(path) ? 'active' : '';
   };
 
   return (
-    <div className="designer-sidebar">
-      <Sidebar width={250} background={"linear-gradient(180deg,#2c3e50 0%, #34495e 100%)"} color="rgba(255,255,255,0.85)">
-        <div className="sidebar-header">
-          <h2 className="sidebar-title">Designer Panel</h2>
-        </div>
-        <Menu hideHeading>
-          <MenuItem
-            icon={<ViewCarouselIcon />}
-            component={RouterLink}
-            link="/designer-packages"
-            isSelected={isPackages}
-          >
-            Manage Packages
-          </MenuItem>
-          <MenuItem
-            icon={<ChatBubbleOutlineIcon />}
-            component={RouterLink}
-            link="/designer-queries"
-            isSelected={isQueries}
-          >
-            Design Queries
-          </MenuItem>
-          <MenuItem icon={<LogoutIcon />} onClick={handleLogout}>
-            Logout
-          </MenuItem>
-        </Menu>
-        <div className="sidebar-footer">
-          © 2025 Baby's Eventique
-        </div>
-      </Sidebar>
-    </div>
+    <aside className="designer-sidebar">
+      <div className="sidebar-header">
+        <h2>Designer Panel</h2>
+        <p>Baby's Eventique</p>
+      </div>
+      <nav className="sidebar-nav">
+        <button 
+          className={isActive('designer-packages')} 
+          onClick={() => navigate('/designer-packages')}
+        >
+          <Package size={18} className="sidebar-icon" />
+          Manage Packages
+        </button>
+        <button 
+          className={isActive('designer-queries')} 
+          onClick={() => navigate('/designer-queries')}
+        >
+          <MessageSquare size={18} className="sidebar-icon" />
+          Design Queries
+        </button>
+      </nav>
+      <button className="sidebar-logout" onClick={handleLogout}>
+        <LogOut size={18} className="sidebar-icon" />
+        Logout
+      </button>
+    </aside>
   );
 }

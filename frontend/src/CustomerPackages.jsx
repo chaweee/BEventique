@@ -216,7 +216,7 @@ export default function CustomerPackages() {
             <button className="cp-link" onClick={() => navigate("/customer-home")}>HOME</button>
             <button className="cp-link" onClick={() => navigate("/customer-packages")}>PACKAGES</button>
             <button className="cp-link" onClick={() => navigate("/bookings")}>MANAGE BOOKINGS</button>
-            <button className="cp-link" onClick={() => navigate("/design-queries")}>DESIGN QUERIES</button>
+            <button className="cp-link" onClick={() => navigate("/design-queries")}>CUSTOMER INQUIRIES</button>
             <div
               className="cp-link cp-logout"
               role="button"

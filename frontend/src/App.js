@@ -33,7 +33,7 @@ function RequireAuth({ children, adminOnly = false }) {
         .toLowerCase();
 
       if (role !== "admin") {
-        return <Navigate to="/customer-home" replace />;
+        return <Navigate to="/login" replace />;
       }
     }
   } catch (e) {
@@ -43,10 +43,21 @@ function RequireAuth({ children, adminOnly = false }) {
   return children;
 }
 
-// Simple root redirect: if logged in go to customer home, otherwise to login
+// Simple root redirect: if logged in go to appropriate dashboard based on role, otherwise to login
 function AuthRedirect() {
   const raw = sessionStorage.getItem("user");
-  return raw ? <Navigate to="/customer-home" replace /> : <Navigate to="/login" replace />;
+  if (!raw) return <Navigate to="/login" replace />;
+  
+  try {
+    const user = JSON.parse(raw);
+    const role = (user.role || user.Role || "").toString().toLowerCase();
+    
+    if (role === "admin") return <Navigate to="/admin-dashboard" replace />;
+    if (role === "designer") return <Navigate to="/designer-packages" replace />;
+    return <Navigate to="/customer-home" replace />;
+  } catch {
+    return <Navigate to="/login" replace />;
+  }
 }
 
 function App() {

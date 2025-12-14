@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import CoolButton from "./CoolButton";
 import "./BookingManagement.css";
+import "./Signup.css";
 
 export default function BookingManagement() {
   const navigate = useNavigate();
@@ -15,6 +17,8 @@ export default function BookingManagement() {
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState("create"); // 'create' or 'edit'
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   
   // Canvas customization state
   const [allowCustomize, setAllowCustomize] = useState(false);
@@ -324,6 +328,10 @@ export default function BookingManagement() {
       const data = await res.json();
 
       if (data.status === "success") {
+        // Show success message
+        setSuccessMessage(modalMode === "create" ? "Your booking has been created successfully." : "Your booking has been updated successfully.");
+        setShowSuccess(true);
+        
         setShowModal(false);
         setAllowCustomize(false);
         // Dispose canvas and remove its element & wrapper
@@ -422,7 +430,7 @@ export default function BookingManagement() {
             <button className="bm-link" onClick={() => navigate("/customer-home")}>HOME</button>
             <button className="bm-link" onClick={() => navigate("/customer-packages")}>PACKAGES</button>
             <button className="bm-link active" onClick={() => navigate("/bookings")}>MANAGE BOOKINGS</button>
-            <button className="bm-link" onClick={() => navigate("/design-queries")}>DESIGN QUERIES</button>
+            <button className="bm-link" onClick={() => navigate("/design-queries")}>CUSTOMER INQUIRIES</button>
             <div className="bm-link bm-logout" onClick={handleLogout}>LOGOUT</div>
           </nav>
         </div>
@@ -435,9 +443,6 @@ export default function BookingManagement() {
               <h1>My Bookings</h1>
               <p>Manage your upcoming events and view history</p>
             </div>
-            <button className="bm-create-btn" onClick={openCreateModal}>
-              + New Booking
-            </button>
           </div>
 
           {loading && <div className="bm-loading">Loading bookings...</div>}
@@ -706,6 +711,19 @@ export default function BookingManagement() {
         <div>Contact: events@babys-eventique.ph • +63 917 123 4567</div>
         <div>© 2025 Baby's Eventique</div>
       </footer>
+      
+      {/* Success Modal */}
+      {showSuccess && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <h3 style={{ color: '#ff4c05ef' }}>{modalMode === "create" ? "Booking Created!" : "Booking Updated!"}</h3>
+            <p>{successMessage}</p>
+            <CoolButton onClick={() => setShowSuccess(false)}>
+              Continue
+            </CoolButton>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

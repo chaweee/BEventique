@@ -6,11 +6,11 @@ const router = express.Router();
 // POST /api/bookings/create
 // ============================================================
 router.post("/create", async (req, res) => {
+        // Debug: Log event_id before insert (cleaned up)
     try {
         const {
-            customer_id,
+                customer_id,
             package_id,
-            event_type,
             event_date,
             event_time,
             location,
@@ -52,13 +52,16 @@ router.post("/create", async (req, res) => {
             });
         }
 
-        // Get Package Details
-        const [pkgRows] = await global.db.query("SELECT Package_Name, Package_Amount, Description, NumTables, NumRoundTables, NumChairs, NumTent, NumPlatform FROM package WHERE Package_ID = ?", [package_id]);
+        // Get Package Details including event_id
+        const [pkgRows] = await global.db.query(
+            "SELECT Package_Name, Package_Amount, Description, NumTables, NumRoundTables, NumChairs, NumTent, NumPlatform, event_id FROM package WHERE Package_ID = ?",
+            [package_id]
+        );
         const packageName = pkgRows.length ? pkgRows[0].Package_Name : "Unknown Package";
         const packageDescription = pkgRows.length ? pkgRows[0].Description : "";
         const basePrice = pkgRows.length ? pkgRows[0].Package_Amount : 0;
         const totalPrice = basePrice; // Can be modified later for discounts, etc.
-        
+        const event_id = pkgRows.length ? pkgRows[0].event_id : null;
         // Build package inclusions from table counts
         const packageInclusions = pkgRows.length ? [
             pkgRows[0].NumTables > 0 ? `${pkgRows[0].NumTables} Tables` : null,
@@ -67,6 +70,9 @@ router.post("/create", async (req, res) => {
             pkgRows[0].NumTent > 0 ? `${pkgRows[0].NumTent} Tent(s)` : null,
             pkgRows[0].NumPlatform > 0 ? `${pkgRows[0].NumPlatform} Platform(s)` : null
         ].filter(Boolean).join(", ") : "";
+
+        // Debug: Log event_id before insert
+        console.log("event_id to insert:", event_id);
         
         // Get Customer Full Name
         const [customerRows] = await global.db.query("SELECT FirstName, LastName, Email, PhoneNumber FROM account WHERE Account_ID = ?", [customer_id]);
@@ -76,24 +82,26 @@ router.post("/create", async (req, res) => {
         const customerPhone = customerRows.length ? customerRows[0].PhoneNumber : "";
         console.log("Customer name:", customerName, "Email:", customerEmail, "Phone:", customerPhone);
         
-        // Insert Booking
+        // Insert Booking with event_id
         const sql = `
             INSERT INTO bookings 
-            (customer_id, package_id, event_type, event_date, event_time, location, base_price, total_price, custom_layout, notes, status, payment_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid')
+            (customer_id, package_id, event_id, event_date, event_time, location, base_price, total_price, custom_layout, notes, status, payment_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const [result] = await global.db.query(sql, [
             customer_id,
             package_id,
-            event_type || null,
+            event_id,
             event_date,
             event_time,
             location,
             basePrice,
             totalPrice,
             custom_layout || null,
-            notes || null
+            notes || null,
+            'pending',
+            'unpaid'
         ]);
 
         return res.json({
@@ -193,69 +201,7 @@ router.get("/my-bookings/:customer_id", async (req, res) => {
 });
 
 // ============================================================
-// 4. UPDATE BOOKING DETAILS (Edit)
-// PUT /api/bookings/update/:id
-// ============================================================
-router.put("/update/:id", async (req, res) => {
-    try {
-        const booking_id = req.params.id;
-        const {
-            event_type,
-            event_date,
-            event_time,
-            location,
-            guest_count,
-            notes
-        } = req.body;
-
-        // Check if booking exists
-        const [existing] = await global.db.query("SELECT * FROM bookings WHERE booking_id = ?", [booking_id]);
-        if (!existing.length) {
-            return res.status(404).json({ status: "error", message: "Booking not found" });
-        }
-
-        // Logic: Prevent editing if status is already 'completed' or 'cancelled'
-        if (['completed', 'cancelled'].includes(existing[0].status)) {
-            return res.status(400).json({ 
-                status: "error", 
-                message: "Cannot edit a completed or cancelled booking." 
-            });
-        }
-
-        const sql = `
-            UPDATE bookings SET
-                event_type = ?,
-                event_date = ?,
-                event_time = ?,
-                location = ?,
-                guest_count = ?,
-                notes = ?
-            WHERE booking_id = ?
-        `;
-
-        await global.db.query(sql, [
-            event_type,
-            event_date,
-            event_time,
-            location,
-            guest_count,
-            notes,
-            booking_id
-        ]);
-
-        return res.json({
-            status: "success",
-            message: "Booking updated successfully"
-        });
-
-    } catch (err) {
-        console.error("Update booking error:", err);
-        return res.status(500).json({ status: "error", message: "Server error" });
-    }
-});
-
-// ============================================================
-// 5. CANCEL BOOKING (or Change Status)
+// 4. CANCEL BOOKING (or Change Status)
 // PATCH /api/bookings/status/:id
 // ============================================================
 router.patch("/status/:id", async (req, res) => {
@@ -307,8 +253,84 @@ router.get('/designer/:designerId', async (req, res) => {
     
     res.json({ status: 'success', bookings });
   } catch (err) {
-    console.error('Error fetching designer bookings:', err);
-    res.status(500).json({ status: 'error', message: 'Server error' });
+    console.error("Fetch bookings by designer error:", err);
+    res.status(500).json({ status: "error", message: "Server error" });
+  }
+});
+
+// ============================================================
+// GET BOOKED DATES (for calendar availability)
+// GET /api/bookings/booked-dates
+// ============================================================
+router.get("/booked-dates", async (req, res) => {
+    try {
+        // Only consider bookings that are not cancelled or deleted
+        const [bookedDates] = await global.db.query(
+            `SELECT DISTINCT DATE(event_date) as booked_date 
+             FROM bookings 
+             WHERE status IN ('pending', 'confirmed', 'completed')
+             AND event_date >= CURDATE()
+             ORDER BY event_date ASC`
+        );
+
+        // Format dates as YYYY-MM-DD strings
+        const dates = bookedDates.map(row => {
+            const date = new Date(row.booked_date);
+            return date.toISOString().split('T')[0];
+        });
+
+        return res.json({
+            status: "success",
+            booked_dates: dates
+        });
+    } catch (err) {
+        console.error("Error fetching booked dates:", err);
+        return res.status(500).json({
+            status: "error",
+            message: "Server error retrieving booked dates"
+        });
+    }
+});
+
+// PUT /api/bookings/:id - Update booking (date, time, location) with date conflict check
+router.put('/:id', async (req, res) => {
+  const bookingId = req.params.id;
+  const { event_date, event_time, location } = req.body;
+
+  if (!event_date || !event_time || !location) {
+    return res.status(400).json({ status: "error", message: "Missing fields" });
+  }
+
+  try {
+    // Check if booking exists and is not cancelled/completed
+    const [existing] = await global.db.query(
+      "SELECT * FROM bookings WHERE booking_id = ?", [bookingId]
+    );
+    if (!existing.length) {
+      return res.status(404).json({ status: "error", message: "Booking not found" });
+    }
+    if (['completed', 'cancelled'].includes(existing[0].status)) {
+      return res.status(400).json({ status: "error", message: "Cannot edit a completed or cancelled booking." });
+    }
+
+    // Check if the new date is already booked by another booking (not cancelled)
+    const [conflict] = await global.db.query(
+      "SELECT booking_id FROM bookings WHERE event_date = ? AND booking_id != ? AND status != 'cancelled' LIMIT 1",
+      [event_date, bookingId]
+    );
+    if (conflict.length > 0) {
+      return res.status(409).json({ status: "error", message: "Date already booked" });
+    }
+
+    // Update booking
+    await global.db.query(
+      "UPDATE bookings SET event_date = ?, event_time = ?, location = ? WHERE booking_id = ?",
+      [event_date, event_time, location, bookingId]
+    );
+    res.json({ status: "success" });
+  } catch (err) {
+    console.error("Update booking error:", err);
+    res.status(500).json({ status: "error", message: "Server error" });
   }
 });
 

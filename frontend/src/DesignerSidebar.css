@@ -1,83 +1,84 @@
+/* Designer Sidebar - Matching Admin Panel Style */
 .designer-sidebar {
   width: 250px;
-  flex-shrink: 0;
-  display: flex;
-}
-
-.designer-sidebar .MuiSidebar-root {
-  width: 250px !important;
-  min-width: 250px;
+  background-color: #895129;
+  color: white;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
 }
 
-/* Header with title */
 .sidebar-header {
-  padding: 24px 20px 16px;
+  padding: 20px;
+  background-color: #6d3f20;
+  text-align: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.sidebar-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
+.sidebar-header h2 { 
+  margin: 0; 
+  font-size: 18px; 
+  color: #ffffff; 
+}
+
+.sidebar-header p { 
+  margin: 5px 0 0; 
+  font-size: 12px; 
+  opacity: 0.7; 
+}
+
+.sidebar-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-top: 20px;
+}
+
+.sidebar-nav button {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.7);
+  padding: 15px 25px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  border-left: 4px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sidebar-icon {
+  flex-shrink: 0;
+}
+
+.sidebar-nav button:hover {
+  background-color: #6d3f20;
   color: white;
-  letter-spacing: 0.3px;
 }
 
-/* Menu item styling */
-.designer-sidebar .MuiMenuItem-root {
-  padding: 12px 20px;
-  margin: 4px 0;
-  border-radius: 0;
-  font-size: 15px;
-  transition: background 0.2s;
+.sidebar-nav button.active {
+  background-color: #6d3f20;
+  color: white;
+  border-left-color: #26bfa0;
 }
 
-.designer-sidebar .MuiMenuItem-root:hover {
-  background: rgba(255, 255, 255, 0.08);
+.sidebar-logout {
+  background: none;
+  border: none;
+  color: #ffffff;
+  padding: 20px;
+  cursor: pointer;
+  text-align: left;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s;
 }
 
-.designer-sidebar .MuiMenuItem-root.Mui-selected {
-  background: rgba(255, 255, 255, 0.15);
-  font-weight: 500;
-}
-
-/* Footer copyright */
-.sidebar-footer {
-  margin-top: auto;
-  padding: 16px 20px;
-  text-align: center;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Hide any unwanted subheadings */
-.designer-sidebar .MuiMenu-subHeading {
-  display: none !important;
-}
-
-/* Hide the menu subheader text */
-.designer-sidebar .MuiListSubheader-root {
-  display: none !important;
-}
-
-/* Hide any text nodes that contain 'menu' */
-.designer-sidebar .MuiMenu-root::before {
-  content: none !important;
-}
-
-.designer-sidebar .MuiMenu-root > *:not(.MuiMenuItem-root) {
-  display: none !important;
-}
-
-/* Hide the profile card at bottom */
-.designer-sidebar .MuiAvatar-root,
-.designer-sidebar [class*="profile"],
-.designer-sidebar [class*="Profile"],
-.designer-sidebar [class*="user"],
-.designer-sidebar [class*="User"] {
-  display: none !important;
+.sidebar-logout:hover {
+  background-color: #6d3f20;
 }
 
