@@ -10,8 +10,12 @@ export default function DesignerQueries() {
   const [selectedThread, setSelectedThread] = useState(null);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [newSubject, setNewSubject] = useState("");
   const [newMessage, setNewMessage] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+  const [bookings, setBookings] = useState([]);
+  const [selectedBooking, setSelectedBooking] = useState("");
+  const [showNewQuery, setShowNewQuery] = useState(false);
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -63,6 +67,23 @@ export default function DesignerQueries() {
   };
 
   useEffect(() => {
+    const fetchBookings = async () => {
+      try {
+        const user = JSON.parse(sessionStorage.getItem("user") || "{}");
+        if (!user.id) return;
+
+        const res = await fetch(`http://localhost:3001/api/bookings/designer/${user.id}`);
+        const data = await res.json();
+        
+        if (data.status === "success") {
+          setBookings(data.bookings || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch bookings:", err);
+      }
+    };
+
+    fetchBookings();
     fetchThreads();
 
     // Initialize Socket.IO connection with reconnection strategy
@@ -231,6 +252,43 @@ export default function DesignerQueries() {
       }
     } catch (err) {
       console.error("Error assigning:", err);
+    }
+  };
+
+  // Submit new query
+  const submitNewQuery = async (e) => {
+    e.preventDefault();
+    if (!selectedBooking.trim() || !newSubject.trim() || !newMessage.trim()) {
+      alert("Please select a booking and fill in all fields");
+      return;
+    }
+
+    try {
+      const user = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const res = await fetch("http://localhost:3001/api/queries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          booking_id: selectedBooking,
+          designer_id: user.id,
+          subject: newSubject,
+          message: newMessage,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.status === "success") {
+        setShowNewQuery(false);
+        setSelectedBooking("");
+        setNewSubject("");
+        setNewMessage("");
+        fetchThreads();
+      } else {
+        alert(data.message || "Failed to create query");
+      }
+    } catch (err) {
+      console.error("Error creating query:", err);
+      alert("Failed to create query");
     }
   };
 
@@ -417,6 +475,123 @@ export default function DesignerQueries() {
             )}
           </div>
         </div>
+
+        {/* New Query Modal (simplified) */}
+        {showNewQuery && (
+          <div className="modal-backdrop" onClick={() => setShowNewQuery(false)}>
+            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+              <h3>New Query</h3>
+              <form onSubmit={submitNewQuery}>
+                <div style={{ marginBottom: "1rem" }}>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                    Select Booking <span style={{ color: "red" }}>*</span>
+                  </label>
+                  <select
+                    value={selectedBooking}
+                    onChange={(e) => setSelectedBooking(e.target.value)}
+                    required
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "1px solid #e4e6eb",
+                      borderRadius: "8px",
+                      fontSize: "0.938rem"
+                    }}
+                  >
+                    <option value="">Choose from your bookings...</option>
+                    {bookings.map((booking) => {
+                      const eventDate = booking.event_date 
+                        ? new Date(booking.event_date).toLocaleDateString('en-US', { 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric' 
+                          })
+                        : 'No date';
+                      const displayText = `${booking.package_name || 'Package'} - ${booking.customer_name || 'Customer'} - ${eventDate}`;
+                      
+                      return (
+                        <option key={booking.id} value={booking.id}>
+                          {displayText}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: "1rem" }}>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                    Subject <span style={{ color: "red" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newSubject}
+                    onChange={(e) => setNewSubject(e.target.value)}
+                    placeholder="Enter query subject"
+                    required
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "1px solid #e4e6eb",
+                      borderRadius: "8px",
+                      fontSize: "0.938rem"
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: "1rem" }}>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                    Message <span style={{ color: "red" }}>*</span>
+                  </label>
+                  <textarea
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Enter your message"
+                    required
+                    rows={4}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "1px solid #e4e6eb",
+                      borderRadius: "8px",
+                      fontSize: "0.938rem",
+                      resize: "vertical"
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewQuery(false)}
+                    style={{
+                      padding: "0.75rem 1.5rem",
+                      background: "#f0f2f5",
+                      border: "none",
+                      borderRadius: "8px",
+                      cursor: "pointer"
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      padding: "0.75rem 1.5rem",
+                      background: "#1877f2",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      fontWeight: 600
+                    }}
+                  >
+                    Send Query
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

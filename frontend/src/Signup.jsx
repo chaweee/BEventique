@@ -94,7 +94,31 @@ export default function SignUp() {
         zIndex: 0
       }} />
       <div className="signup-split" style={{position: 'relative', zIndex: 1}}>
-        {/* LEFT: frosted glass sign-up form */}
+
+        {/* RIGHT: image placeholder (moved to the left visually by swapping order) */}
+        <aside className="signup-right" aria-hidden>
+          <div className="image-panel" style={{
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            backgroundColor: 'transparent'
+          }}>
+            <img 
+              src={logo} 
+              alt="Eventique Logo" 
+              style={{
+                width: '100%',
+                maxWidth: 'none',
+                height: 'auto',
+                transform: 'translateY(12px) scale(1.4)', // moved down slightly
+                transformOrigin: 'center center',
+                filter: 'drop-shadow(0 20px 40px rgba(0, 0, 0, 0.3)) drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2))'
+              }} 
+            />
+          </div>
+        </aside>
+
+        {/* LEFT: frosted glass sign-up form (moved to the right visually by swapping order) */}
         <section className="signup-left">
           <form className="glass-card" onSubmit={submitSignup} noValidate>
             <h1 className="glass-title">Create Your Account</h1>
@@ -191,25 +215,6 @@ export default function SignUp() {
           </form>
         </section>
 
-        {/* RIGHT: image placeholder */}
-        <aside className="signup-right" aria-hidden>
-          <div className="image-panel" style={{
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            backgroundColor: 'transparent'
-          }}>
-            <img 
-              src={logo} 
-              alt="Eventique Logo" 
-              style={{
-                width: '350px', 
-                height: 'auto',
-                filter: 'drop-shadow(0 20px 40px rgba(0, 0, 0, 0.3)) drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2))'
-              }} 
-            />
-          </div>
-        </aside>
       </div>
 
       {/* success dialog */}

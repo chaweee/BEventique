@@ -1,3 +1,5 @@
+// NOTE: If you see "Module not found: Can't resolve 'sweetalert2'", run:
+//   c:\xampp\htdocs\Eventique\install_sweetalert2.cmd
 import React, { useState, useEffect } from "react";
 
 export default function AdminContentHeader({ title }) {

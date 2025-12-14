@@ -276,4 +276,32 @@ router.patch("/status/:id", async (req, res) => {
     }
 });
 
+// ============================================================
+// 6. GET BOOKINGS BY DESIGNER ID
+// GET /api/bookings/designer/:designerId
+// ============================================================
+router.get('/designer/:designerId', async (req, res) => {
+  try {
+    const { designerId } = req.params;
+    const [bookings] = await db.query(
+      `SELECT b.*, 
+              c.Full_Name as customer_name,
+              p.Package_Name as package_name,
+              b.event_date,
+              b.event_type
+       FROM bookings b 
+       LEFT JOIN customers c ON b.customer_id = c.id 
+       LEFT JOIN packages p ON b.package_id = p.id
+       WHERE b.designer_id = ? 
+       ORDER BY b.event_date DESC, b.created_at DESC`,
+      [designerId]
+    );
+    
+    res.json({ status: 'success', bookings });
+  } catch (err) {
+    console.error('Error fetching designer bookings:', err);
+    res.status(500).json({ status: 'error', message: 'Server error' });
+  }
+});
+
 module.exports = router;

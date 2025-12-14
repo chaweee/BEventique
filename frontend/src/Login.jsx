@@ -61,35 +61,35 @@ export default function Login() {
     setShowSuccess(false);
     const role = (loggedUser?.role || "").toLowerCase();
 
-    if (role === "admin") {
-      navigate("/admin-dashboard");
-    } else if (role === "designer") {
-      navigate("/designer-packages");
-    } else {
-      navigate("/customer-home");
-    }
+    if (role === "admin") navigate("/admin-dashboard");
+    else if (role === "designer") navigate("/designer-packages");
+    else navigate("/customer-home");
   };
 
   return (
-    <div className="signup-root" style={{
-      backgroundImage: `url(${bgImage})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-      backgroundRepeat: 'no-repeat',
-      position: 'relative'
-    }}>
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.85)',
-        zIndex: 0
-      }} />
-      <div className="signup-split" style={{position: 'relative', zIndex: 1}}>
+    <div
+      className="signup-root"
+      style={{
+        backgroundImage: `url(${bgImage})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        position: "relative",
+      }}
+    >
+      {/* white overlay */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundColor: "rgba(255, 255, 255, 0.85)",
+          zIndex: 0,
+        }}
+      />
 
-        {/* LEFT: Glass Login Form */}
+      <div className="signup-split" style={{ position: "relative", zIndex: 1 }}>
+
+        {/* LEFT: Login Form */}
         <section className="signup-left">
           <form className="glass-card" onSubmit={submitLogin} noValidate>
             <h1 className="glass-title">Welcome Back</h1>
@@ -127,41 +127,44 @@ export default function Login() {
                   Sign Up
                 </button>
               </span>
-              <span className="copyright">
-                © 2025 Catering Service
-              </span>
+              <span className="copyright">© 2025 Catering Service</span>
             </div>
           </form>
         </section>
 
-        {/* RIGHT: Logo Showcase */}
+        {/* RIGHT: LOGO PANEL (COPIED EXACTLY FROM SIGNUP) */}
         <aside className="signup-right" aria-hidden>
-          <div className="logo-panel" style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'transparent'
-          }}>
+          <div
+            className="image-panel"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "transparent",
+            }}
+          >
             <img
               src={logo}
               alt="Eventique Logo"
-              className="logo-showcase"
               style={{
-                width: '350px',
-                height: 'auto',
-                filter: 'drop-shadow(0 20px 40px rgba(0, 0, 0, 0.3)) drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2))'
+                width: "100%",
+                maxWidth: "none",
+                height: "auto",
+                transform: "translateY(12px) scale(1.4)",
+                transformOrigin: "center center",
+                filter:
+                  "drop-shadow(0 20px 40px rgba(0,0,0,0.3)) drop-shadow(0 10px 20px rgba(0,0,0,0.2))",
               }}
             />
           </div>
         </aside>
-
       </div>
 
       {/* Success Modal */}
       {showSuccess && (
         <div className="modal-backdrop">
           <div className="modal-card">
-            <h3>Logged in Successfully</h3>
+            <h3 style={{ color: '#ff4c05ef' }}>Logged in Successfully!</h3>
             <p>
               Have a good day
               {loggedUser?.firstname ? `, ${loggedUser.firstname}` : ""}.

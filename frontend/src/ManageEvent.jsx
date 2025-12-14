@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { Search } from "lucide-react";
-import Swal from "sweetalert2";
+import SwalLib from "sweetalert2";
+
+// Optional minimal fallback (keeps runtime stable if package missing).
+// If you prefer not to include fallback, just keep the import above and ensure npm install was run.
+if (!SwalLib || typeof SwalLib.fire !== "function") {
+  // eslint-disable-next-line no-global-assign
+  SwalLib = {
+    fire: async ({ title = "", text = "" }) => {
+      alert((title ? title + "\n" : "") + text);
+      return { isConfirmed: true };
+    },
+  };
+}
 
 export default function ManageEvent() {
   const [bookings, setBookings] = useState([]);
@@ -58,7 +70,7 @@ export default function ManageEvent() {
 
   const updateStatus = async (id, newStatus) => {
     try {
-      const result = await Swal.fire({
+      const result = await SwalLib.fire({
         title: "Update Status",
         html: `<p>Mark this booking as <strong>${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}</strong>?</p>`,
         icon: "question",
@@ -82,7 +94,7 @@ export default function ManageEvent() {
         });
 
         if (res.ok) {
-          await Swal.fire({
+          await SwalLib.fire({
             title: "Success!",
             text: `Status updated to ${newStatus}`,
             icon: "success",
@@ -92,7 +104,7 @@ export default function ManageEvent() {
           });
           fetchBookings();
         } else {
-          Swal.fire({
+          SwalLib.fire({
             title: "Error",
             text: "Failed to update status",
             icon: "error",
@@ -101,7 +113,7 @@ export default function ManageEvent() {
         }
       }
     } catch (err) {
-      Swal.fire({
+      SwalLib.fire({
         title: "Error",
         text: "An error occurred while updating status",
         icon: "error",
