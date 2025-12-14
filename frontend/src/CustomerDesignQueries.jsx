@@ -1,34 +1,191 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
+import Swal from "sweetalert2";
 import "./CustomerDesignQueries.css";
 
 export default function CustomerDesignQueries() {
   const navigate = useNavigate();
-  const [threads, setThreads] = useState([]);
-  const [selectedThread, setSelectedThread] = useState(null);
-  const [messages, setMessages] = useState([]);
+  const [queries, setQueries] = useState([]);
+  const [selectedQuery, setSelectedQuery] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showNewQueryModal, setShowNewQueryModal] = useState(false);
-  const [newMessage, setNewMessage] = useState("");
+  const [bookings, setBookings] = useState([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [replyMessage, setReplyMessage] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
 
   // Form state for creating new query
   const [newQueryForm, setNewQueryForm] = useState({
     booking_id: "",
-    subject: "",
     message: ""
   });
 
   // Get client ID from session/localStorage
   const getClientId = () => {
     const user = JSON.parse(sessionStorage.getItem("user") || "{}");
-    return user.Account_ID || localStorage.getItem("userId");
+    return user.id || user.Account_ID || localStorage.getItem("userId");
   };
 
-  // Fetch customer's query threads
+  // Fetch messages for a specific query
+  const fetchMessages = async (queryId) => {
+    setMessagesLoading(true);
+    try {
+      const res = await fetch(`http://localhost:3001/api/queries/${queryId}/messages`);
+      const data = await res.json();
+      
+      console.log("💬 Fetched messages:", data);
+      console.log("   Total messages:", data.messages?.length);
+      data.messages?.forEach((msg, idx) => {
+        console.log(`   [${idx}] sender_id:${msg.sender_id}, is_designer:${msg.is_designer}, message:"${msg.message?.substring(0, 30)}"`);
+      });
+      
+      if (data.status === "success") {
+        setMessages(data.messages || []);
+      } else {
+        console.error("Error fetching messages:", data.message);
+        setMessages([]);
+      }
+    } catch (err) {
+      console.error("Error fetching messages:", err);
+      setMessages([]);
+    } finally {
+      setMessagesLoading(false);
+    }
+  };
+
+  // Send reply message
+  const handleSendReply = async (e) => {
+    e.preventDefault();
+    
+    if (!replyMessage.trim() || !selectedQuery) {
+      return;
+    }
+    
+    setSendingReply(true);
+    try {
+      const clientId = getClientId();
+      const res = await fetch(`http://localhost:3001/api/queries/${selectedQuery.query_id}/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sender_id: clientId,
+          message: replyMessage.trim(),
+          is_designer: false
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (data.status === "success") {
+        console.log("✅ Reply sent successfully");
+        setReplyMessage("");
+        // Refresh messages
+        await fetchMessages(selectedQuery.query_id);
+        // Scroll to bottom
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        console.error("Error sending reply:", data.message);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Failed to send reply"
+        });
+      }
+    } catch (err) {
+      console.error("Error sending reply:", err);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "An error occurred while sending your reply"
+      });
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  // Fetch bookings for dropdown
+  const fetchBookings = React.useCallback(async () => {
+    console.log("🔍 fetchBookings called");
+    setBookingsLoading(true);
+    try {
+      const user = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const clientId = user.id || user.Account_ID || localStorage.getItem("userId");
+      
+      console.log("   User from sessionStorage:", user);
+      console.log("   Client ID:", clientId);
+      
+      if (!clientId) {
+        console.warn("⚠️ No client ID found!");
+        setBookings([]);
+        setBookingsLoading(false);
+        return;
+      }
+      
+      const url = `http://localhost:3001/api/bookings/my-bookings/${clientId}`;
+      console.log("   Fetching from:", url);
+      
+      const res = await fetch(url);
+      console.log("   Response status:", res.status);
+      
+      const data = await res.json();
+      console.log("   Response data:", data);
+      console.log("   Response bookings count:", data.bookings?.length || 0);
+      
+      if (data.status === "success" && Array.isArray(data.bookings)) {
+        console.log("   ✅ Found", data.bookings.length, "bookings");
+        console.log("   Before setBookings - bookings state:", bookings);
+        console.log("   Calling setBookings with:", data.bookings);
+        setBookings(data.bookings);
+        console.log("   After setBookings - bookings state should update soon");
+      } else {
+        console.warn("   ⚠️ No bookings in response or unexpected format");
+        console.warn("   data.status:", data.status);
+        console.warn("   is array?:", Array.isArray(data.bookings));
+        setBookings([]);
+      }
+    } catch (err) {
+      console.error("❌ Error fetching bookings:", err);
+      setBookings([]);
+    } finally {
+      console.log("   Finally block - setBookingsLoading(false)");
+      setBookingsLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fetch customer's queries (messenger style)
+  const fetchQueries = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const clientId = getClientId();
+      const res = await fetch(`http://localhost:3001/api/queries/customer/${clientId}`);
+      const data = await res.json();
+      
+      console.log("📋 Fetched queries:", data);
+      
+      if (data.status === "success") {
+        setQueries(data.queries || []);
+      } else {
+        setError(data.message || "Failed to fetch queries");
+      }
+    } catch (err) {
+      console.error("Error fetching queries:", err);
+      setError("Network error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Keep old fetchThreads for backward compatibility
   const fetchThreads = async () => {
     setLoading(true);
     setError("");
@@ -38,7 +195,7 @@ export default function CustomerDesignQueries() {
       const data = await res.json();
       
       if (data.status === "success") {
-        setThreads(data.threads);
+        setQueries(data.queries || []);
       } else {
         setError(data.message || "Failed to fetch queries");
       }
@@ -49,28 +206,32 @@ export default function CustomerDesignQueries() {
     }
   };
 
-  // Fetch messages for selected thread
-  const fetchMessages = async (threadId) => {
-    try {
-      const res = await fetch(`http://localhost:3001/api/queries/messages/${threadId}`);
-      const data = await res.json();
-      
-      if (data.status === "success") {
-        setMessages(data.messages);
-        // Mark messages as read
-        await fetch(`http://localhost:3001/api/queries/mark-read/${threadId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ is_designer: false })
-        });
-      }
-    } catch (err) {
-      console.error("Error fetching messages:", err);
-    }
+  // Handle query selection - fetch messages
+  const handleSelectQuery = (query) => {
+    setSelectedQuery(query);
+    setReplyMessage("");
+    setMessages([]);
+    fetchMessages(query.query_id);
   };
 
+  // Log whenever bookings state changes
   useEffect(() => {
-    fetchThreads();
+    console.log("📊 BOOKINGS STATE CHANGED - current value:", bookings);
+    console.log("   Length:", bookings?.length);
+    console.log("   Is array?:", Array.isArray(bookings));
+  }, [bookings]);
+
+  // Auto-fetch bookings when modal opens
+  useEffect(() => {
+    console.log("🔔 useEffect triggered - showNewQueryModal:", showNewQueryModal);
+    if (showNewQueryModal) {
+      console.log("📂 Modal opened - fetching bookings");
+      fetchBookings();
+    }
+  }, [showNewQueryModal, fetchBookings]);
+
+  useEffect(() => {
+    fetchQueries();
 
     // Initialize Socket.IO connection with reconnection strategy
     socketRef.current = io("http://localhost:3001", {
@@ -85,13 +246,8 @@ export default function CustomerDesignQueries() {
 
     socketRef.current.on("connect", () => {
       console.log("✅ Socket connected", socketRef.current.id);
-      // Re-fetch threads on (re)connect for freshness
-      fetchThreads();
-      // Rejoin selected thread room if any
-      if (selectedThread) {
-        socketRef.current.emit("join_thread", selectedThread.thread_id);
-        fetchMessages(selectedThread.thread_id);
-      }
+      // Re-fetch queries on (re)connect for freshness
+      fetchQueries();
     });
 
     socketRef.current.on("connect_error", (err) => {
@@ -111,24 +267,6 @@ export default function CustomerDesignQueries() {
       console.log("⚐ Socket disconnected:", reason);
     });
 
-    // Listen for new messages
-    socketRef.current.on("new_message", (newMsg) => {
-      // Only append if this message belongs to current thread
-      if (selectedThread && newMsg.thread_id === selectedThread.thread_id) {
-        setMessages((prev) => [...prev, newMsg]);
-        scrollToBottom();
-      }
-    });
-
-    // Listen for thread updates (refresh list)
-    socketRef.current.on("thread_updated", ({ thread_id }) => {
-      fetchThreads();
-      // If current thread updated, optionally refetch messages for consistency
-      if (selectedThread && selectedThread.thread_id === thread_id) {
-        fetchMessages(thread_id);
-      }
-    });
-
     // Cleanup on unmount
     return () => {
       if (socketRef.current) {
@@ -138,37 +276,6 @@ export default function CustomerDesignQueries() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Open conversation
-  const openConversation = (thread) => {
-    // Leave previous thread room
-    if (selectedThread && socketRef.current) {
-      socketRef.current.emit("leave_thread", selectedThread.thread_id);
-    }
-
-    setSelectedThread(thread);
-    fetchMessages(thread.thread_id);
-
-    // Join new thread room
-    if (socketRef.current) {
-      socketRef.current.emit("join_thread", thread.thread_id);
-    }
-  };
-
-  // Close conversation
-  const closeConversation = () => {
-    if (selectedThread && socketRef.current) {
-      socketRef.current.emit("leave_thread", selectedThread.thread_id);
-    }
-    setSelectedThread(null);
-    setMessages([]);
-    setNewMessage("");
-  };
-
-  // Scroll to bottom of messages
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   // Create new query
   const handleCreateQuery = async (e) => {
     e.preventDefault();
@@ -176,6 +283,8 @@ export default function CustomerDesignQueries() {
     
     try {
       const clientId = getClientId();
+      console.log("🚀 Creating query with:", { clientId, ...newQueryForm });
+      
       const res = await fetch("http://localhost:3001/api/queries/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -185,106 +294,87 @@ export default function CustomerDesignQueries() {
         })
       });
       
+      console.log("📬 Response status:", res.status);
+      
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("❌ Non-OK response:", res.status, text);
+        setError("Server error: " + res.status + " - " + text.substring(0, 100));
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Failed to create design query. Please try again."
+        });
+        return;
+      }
+      
       const data = await res.json();
+      console.log("✅ Response data:", data);
       
       if (data.status === "success") {
         setShowNewQueryModal(false);
-        setNewQueryForm({ booking_id: "", subject: "", message: "" });
+        setNewQueryForm({ booking_id: "", message: "" });
+        
+        // Success alert
+        Swal.fire({
+          icon: "success",
+          title: "Design Query Created!",
+          text: "Your design inquiry has been submitted successfully.",
+          confirmButtonColor: "#26bfa0"
+        });
+        
         fetchThreads();
       } else {
         setError(data.message);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: data.message || "Failed to create design query."
+        });
       }
     } catch (err) {
-      setError("Network error: " + err.message);
-    }
-  };
-
-  // Send message in conversation
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!newMessage.trim()) return;
-    
-    try {
-      const clientId = getClientId();
-      const res = await fetch("http://localhost:3001/api/queries/message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          thread_id: selectedThread.thread_id,
-          sender_id: clientId,
-          message: newMessage,
-          is_designer: false
-        })
+      console.error("❌ Error:", err);
+      setError("Error: " + err.message);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "An error occurred: " + err.message
       });
-      
-      const data = await res.json();
-      
-      if (data.status === "success") {
-        setNewMessage("");
-        scrollToBottom();
-        // No need to manually fetch - Socket.IO will update in real-time
-      }
-    } catch (err) {
-      console.error("Error sending message:", err);
     }
   };
 
   // Get status badge color
-  const getStatusColor = (status) => {
-    const colors = {
-      open: "#f59e0b",
-      in_progress: "#3b82f6",
-      resolved: "#10b981",
-      closed: "#6b7280"
-    };
-    return colors[status] || "#6b7280";
-  };
-
-  // Format date
-  const formatDate = (dateString) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-    
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  };
-
-  const formatMessageTime = (dateString) => {
-    if (!dateString) return "";
-    return new Date(dateString).toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-  };
-
   return (
     <div className="cdq-root">
-      {/* Header */}
-      <header className="cdq-header">
-        <div className="cdq-brand" onClick={() => navigate("/customer-home")}>
-          Eventique
+      {/* Header - Match Packages navbar style */}
+      <header className="cdq-navbar">
+        <div className="cdq-navbar-container">
+          <div className="cdq-navbar-brand">
+            <h1 className="cdq-brand-title">Baby's Eventique</h1>
+          </div>
+
+          <nav className="cdq-nav">
+            <button className="cdq-link" onClick={() => navigate("/customer-home")}>HOME</button>
+            <button className="cdq-link" onClick={() => navigate("/customer-packages")}>PACKAGES</button>
+            <button className="cdq-link" onClick={() => navigate("/bookings")}>MANAGE BOOKINGS</button>
+            <button className="cdq-link" onClick={() => navigate("/design-queries")}>DESIGN QUERIES</button>
+            <div
+              className="cdq-link cdq-logout"
+              role="button"
+              tabIndex={0}
+              onClick={() => { sessionStorage.removeItem("user"); navigate("/login"); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  sessionStorage.removeItem("user");
+                  navigate("/login");
+                }
+              }}
+            >
+              LOGOUT
+            </div>
+          </nav>
         </div>
-        <nav className="cdq-nav">
-          <button onClick={() => navigate("/customer-home")}>HOME</button>
-          <button onClick={() => navigate("/customer-packages")}>PACKAGES</button>
-          <button className="active">DESIGN QUERIES</button>
-        </nav>
-        <button 
-          className="cdq-logout" 
-          onClick={() => { sessionStorage.removeItem("user"); navigate("/login"); }}
-        >
-          LOGOUT
-        </button>
       </header>
 
       {/* Main Content - Conversation Interface */}
@@ -294,44 +384,39 @@ export default function CustomerDesignQueries() {
           <aside className="cdq-sidebar">
             <div className="cdq-sidebar-header">
               <h2>Messages</h2>
-              <button className="cdq-new-btn" onClick={() => setShowNewQueryModal(true)}>
+              <button className="cdq-new-btn" onClick={() => { fetchBookings(); setShowNewQueryModal(true); }}>
                 +
               </button>
             </div>
 
             {loading ? (
               <div className="cdq-loading">Loading...</div>
-            ) : threads.length === 0 ? (
+            ) : queries.length === 0 ? (
               <div className="cdq-empty-sidebar">
-                <p>No conversations yet</p>
-                <button onClick={() => setShowNewQueryModal(true)}>Start a query</button>
+                <p>No queries yet</p>
+                <button onClick={() => { fetchBookings(); setShowNewQueryModal(true); }}>Start a query</button>
               </div>
             ) : (
               <div className="cdq-thread-list">
-                {threads.map((thread) => (
+                {queries.map((query) => (
                   <div
-                    key={thread.thread_id}
-                    className={`cdq-thread-item ${selectedThread?.thread_id === thread.thread_id ? "active" : ""}`}
-                    onClick={() => openConversation(thread)}
+                    key={query.query_id}
+                    className={`cdq-thread-item ${selectedQuery?.query_id === query.query_id ? "active" : ""}`}
+                    onClick={() => handleSelectQuery(query)}
                   >
                     <div className="thread-header">
-                      <span className="thread-subject">{thread.subject}</span>
-                      {thread.unread_count > 0 && (
-                        <span className="unread-badge">{thread.unread_count}</span>
-                      )}
+                      <span className="thread-subject">
+                        {query.customer_name || "Unknown Customer"}
+                      </span>
                     </div>
                     <div className="thread-preview">
-                      {thread.last_message?.substring(0, 50)}
-                      {thread.last_message?.length > 50 && "..."}
+                      {query.message?.substring(0, 50)}
+                      {query.message?.length > 50 && "..."}
                     </div>
                     <div className="thread-footer">
-                      <span 
-                        className="thread-status"
-                        style={{ backgroundColor: getStatusColor(thread.status) }}
-                      >
-                        {thread.status}
+                      <span className="thread-time">
+                        {new Date(query.created_at).toLocaleDateString()}
                       </span>
-                      <span className="thread-time">{formatDate(thread.updated_at)}</span>
                     </div>
                   </div>
                 ))}
@@ -341,60 +426,82 @@ export default function CustomerDesignQueries() {
 
           {/* Right Panel - Conversation */}
           <div className="cdq-conversation">
-            {!selectedThread ? (
+            {!selectedQuery ? (
               <div className="cdq-no-selection">
                 <div className="empty-icon">💬</div>
-                <h2>Select a conversation</h2>
-                <p>Choose a query from the list to view the conversation</p>
+                <h2>Select a query</h2>
+                <p>Choose a query from the list to view the details</p>
               </div>
             ) : (
               <>
-                {/* Conversation Header */}
+                {/* Query Details Header */}
                 <div className="cdq-conv-header">
                   <div>
-                    <h3>{selectedThread.subject}</h3>
+                    <h3>{selectedQuery.customer_name || "Unknown Customer"}</h3>
                     <p className="conv-meta">
-                      {selectedThread.booking_id && `Booking #${selectedThread.booking_id} • `}
-                      <span style={{ color: getStatusColor(selectedThread.status) }}>
-                        {selectedThread.status}
-                      </span>
-                      {selectedThread.designer_firstname && ` • Assigned to ${selectedThread.designer_firstname}`}
+                      {selectedQuery.event_type && `${selectedQuery.event_type} • `}
+                      {selectedQuery.event_date && new Date(selectedQuery.event_date).toLocaleDateString()}
                     </p>
                   </div>
-                  <button className="cdq-close-conv" onClick={closeConversation}>✕</button>
+                  <button className="cdq-close-conv" onClick={() => setSelectedQuery(null)}>✕</button>
                 </div>
 
-                {/* Messages */}
+                {/* Messages Area */}
                 <div className="cdq-messages">
-                  {messages.map((msg) => (
-                    <div
-                      key={msg.message_id}
-                      className={`cdq-message ${msg.is_designer ? "designer" : "customer"}`}
-                    >
-                      <div className="message-bubble">
-                        <div className="message-header">
-                          <strong>{msg.is_designer ? `${msg.Firstname} ${msg.Lastname}` : "You"}</strong>
-                          <span className="message-time">{formatMessageTime(msg.created_at)}</span>
+                  {messagesLoading ? (
+                    <div className="cdq-loading-messages">Loading messages...</div>
+                  ) : (
+                    <>
+                      {/* Conversation Messages - Grouped by reply_to, ordered by created_at */}
+                      {messages && messages.length > 0 && messages.map((msg) => {
+                        const isAdmin = msg.sender_id === null;
+                        const msgClass = msg.is_designer ? "designer" : isAdmin ? "admin" : "customer";
+                        return (
+                          <div
+                            key={msg.message_id}
+                            className={`cdq-message ${msgClass}`}
+                          >
+                            <div className="message-bubble">
+                              <div className="message-header">
+                                <strong>{isAdmin ? "Admin" : msg.sender_name || "Unknown"}</strong>
+                                <span className="message-time">
+                                  {new Date(msg.created_at).toLocaleString()}
+                                </span>
+                              </div>
+                              <div className="message-text">{msg.message}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      {messages && messages.length === 0 && (
+                        <div className="cdq-no-replies">
+                          <p>No messages yet</p>
                         </div>
-                        <div className="message-text">{msg.message}</div>
-                      </div>
-                    </div>
-                  ))}
-                  <div ref={messagesEndRef} />
+                      )}
+
+                      <div ref={messagesEndRef} />
+                    </>
+                  )}
                 </div>
 
-                {/* Message Input */}
-                {selectedThread.status !== "closed" && (
-                  <form className="cdq-message-input" onSubmit={handleSendMessage}>
-                    <input
-                      type="text"
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      placeholder="Type your message..."
-                    />
-                    <button type="submit">Send</button>
-                  </form>
-                )}
+                {/* Reply Input Area */}
+                <form className="cdq-reply-form" onSubmit={handleSendReply}>
+                  <textarea
+                    value={replyMessage}
+                    onChange={(e) => setReplyMessage(e.target.value)}
+                    placeholder="Message"
+                    rows="3"
+                    disabled={sendingReply}
+                  />
+                  <button
+                    type="submit"
+                    className="cdq-reply-send-btn"
+                    disabled={!replyMessage.trim() || sendingReply}
+                  >
+                    {sendingReply ? "Sending..." : "Send"}
+                  </button>
+                </form>
               </>
             )}
           </div>
@@ -412,24 +519,25 @@ export default function CustomerDesignQueries() {
             
             <form onSubmit={handleCreateQuery} className="cdq-form">
               <div className="cdq-form-group">
-                <label>Booking ID (Optional)</label>
-                <input
-                  type="number"
-                  value={newQueryForm.booking_id}
-                  onChange={(e) => setNewQueryForm({...newQueryForm, booking_id: e.target.value})}
-                  placeholder="Enter booking ID if related"
-                />
-              </div>
-              
-              <div className="cdq-form-group">
-                <label>Subject *</label>
-                <input
-                  type="text"
-                  value={newQueryForm.subject}
-                  onChange={(e) => setNewQueryForm({...newQueryForm, subject: e.target.value})}
-                  placeholder="e.g., Need to reschedule booking"
-                  required
-                />
+                <label>My Bookings *</label>
+                {bookingsLoading ? (
+                  <p style={{ color: "#999" }}>⏳ Loading bookings...</p>
+                ) : bookings && bookings.length > 0 ? (
+                  <select
+                    value={newQueryForm.booking_id}
+                    onChange={(e) => setNewQueryForm({...newQueryForm, booking_id: e.target.value})}
+                    required
+                  >
+                    <option value="">-- Select a booking --</option>
+                    {bookings.map((booking) => (
+                      <option key={booking.booking_id} value={booking.booking_id}>
+                        {booking.event_type} - {new Date(booking.event_date).toLocaleDateString()}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p style={{ color: "#999" }}>❌ No bookings found</p>
+                )}
               </div>
               
               <div className="cdq-form-group">

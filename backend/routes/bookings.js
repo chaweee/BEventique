@@ -131,10 +131,12 @@ router.get("/all", async (req, res) => {
                 CONCAT(a.FirstName, ' ', a.LastName) AS client_name,
                 a.Email AS client_email,
                 a.PhoneNumber AS client_phone,
-                p.Package_Name
+                p.Package_Name,
+                e.event_type
             FROM bookings b
             JOIN account a ON b.customer_id = a.Account_ID
             JOIN package p ON b.package_id = p.Package_ID
+            LEFT JOIN event e ON b.event_id = e.event_id
             ORDER BY b.event_date ASC
         `;
 
@@ -158,20 +160,26 @@ router.get("/all", async (req, res) => {
 router.get("/my-bookings/:customer_id", async (req, res) => {
     try {
         const { customer_id } = req.params;
+        console.log("=== FETCHING BOOKINGS ===");
+        console.log("Customer ID:", customer_id, "Type:", typeof customer_id);
 
         const sql = `
             SELECT 
                 b.*,
                 p.Package_Name,
                 p.Description,
-                p.Package_Amount
+                p.Package_Amount,
+                e.event_type
             FROM bookings b
-            JOIN package p ON b.package_id = p.Package_ID
+            LEFT JOIN package p ON b.package_id = p.Package_ID
+            LEFT JOIN event e ON b.event_id = e.event_id
             WHERE b.customer_id = ?
             ORDER BY b.created_at DESC
         `;
 
         const [rows] = await global.db.query(sql, [customer_id]);
+        console.log("Bookings found:", rows.length);
+        console.log("Bookings data:", rows);
 
         return res.json({
             status: "success",
