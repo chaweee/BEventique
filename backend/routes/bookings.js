@@ -75,9 +75,9 @@ router.post("/create", async (req, res) => {
         console.log("event_id to insert:", event_id);
         
         // Get Customer Full Name
-        const [customerRows] = await global.db.query("SELECT FirstName, LastName, Email, PhoneNumber FROM account WHERE Account_ID = ?", [customer_id]);
+        const [customerRows] = await global.db.query("SELECT Firstname, Lastname, Email, PhoneNumber FROM accounts WHERE Account_ID = ?", [customer_id]);
         console.log("Customer query for Account_ID:", customer_id, "Result:", customerRows);
-        const customerName = customerRows.length ? `${customerRows[0].FirstName} ${customerRows[0].LastName}` : "Unknown Customer";
+        const customerName = customerRows.length ? `${customerRows[0].Firstname} ${customerRows[0].Lastname}` : "Unknown Customer";
         const customerEmail = customerRows.length ? customerRows[0].Email : "";
         const customerPhone = customerRows.length ? customerRows[0].PhoneNumber : "";
         console.log("Customer name:", customerName, "Email:", customerEmail, "Phone:", customerPhone);
@@ -136,13 +136,13 @@ router.get("/all", async (req, res) => {
         const sql = `
             SELECT 
                 b.*,
-                CONCAT(a.FirstName, ' ', a.LastName) AS client_name,
-                a.Email AS client_email,
-                a.PhoneNumber AS client_phone,
+                    CONCAT(a.Firstname, ' ', a.Lastname) AS client_name,
+                    a.Email AS client_email,
+                    a.PhoneNumber AS client_phone,
                 p.Package_Name,
                 e.event_type
             FROM bookings b
-            JOIN account a ON b.customer_id = a.Account_ID
+            JOIN accounts a ON b.customer_id = a.Account_ID
             JOIN package p ON b.package_id = p.Package_ID
             LEFT JOIN event e ON b.event_id = e.event_id
             ORDER BY b.event_date ASC

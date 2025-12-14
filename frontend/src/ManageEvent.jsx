@@ -188,7 +188,25 @@ export default function ManageEvent() {
       setLoading(true);
       const res = await fetch("http://localhost:3001/api/bookings/all");
       const data = await res.json();
-      if (data.status === "success") setBookings(data.bookings);
+      if (data.status === "success") {
+        setBookings(data.bookings);
+
+        // Auto-confirm bookings with paid payment_status
+        data.bookings.forEach(async (b) => {
+          if (b.payment_status === "paid" && b.status !== "confirmed") {
+            try {
+              await fetch(`http://localhost:3001/api/bookings/status/${b.booking_id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "confirmed" })
+              });
+            } catch (err) {
+              // Optionally log error, but don't block UI
+              console.error("Auto-confirm booking failed", err);
+            }
+          }
+        });
+      }
       setLoading(false);
     } catch (err) { console.error(err); setLoading(false); }
   };

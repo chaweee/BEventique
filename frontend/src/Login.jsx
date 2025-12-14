@@ -75,14 +75,15 @@ export default function Login() {
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
         position: "relative",
+        minHeight: "100vh",
       }}
     >
-      {/* white overlay */}
+      {/* semi-transparent overlay for better background visibility */}
       <div
         style={{
           position: "absolute",
           inset: 0,
-          backgroundColor: "rgba(255, 255, 255, 0.85)",
+          background: "linear-gradient(rgba(255,255,255,0.65), rgba(255,255,255,0.65))",
           zIndex: 0,
         }}
       />

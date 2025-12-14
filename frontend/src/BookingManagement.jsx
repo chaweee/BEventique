@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import CoolButton from "./CoolButton";
 import "./BookingManagement.css";
 import "./Signup.css";
+import PaymentReceipt from "./components/PaymentReceipt"; // Add this import
 
 export default function BookingManagement() {
   const navigate = useNavigate();
@@ -37,6 +38,10 @@ export default function BookingManagement() {
     guest_count: 0,
     notes: ""
   });
+
+  // New state for viewing details
+  const [viewDetailsModal, setViewDetailsModal] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState(null);
 
   // Check Login & Initial Fetch
   useEffect(() => {
@@ -418,6 +423,26 @@ export default function BookingManagement() {
     }
   };
 
+  // Handler for viewing details
+  const handleViewDetails = (booking) => {
+    setSelectedBooking(booking);
+    setViewDetailsModal(true);
+  };
+
+  // Handler for downloading receipt (print)
+  const handleDownloadReceipt = () => {
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write('<html><head><title>Receipt</title></head><body>');
+    printWindow.document.write(document.getElementById('receipt-print-area').innerHTML);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 500);
+  };
+
   return (
     <div className="bm-root">
       {/* Navbar (Reusable) */}
@@ -483,10 +508,6 @@ export default function BookingManagement() {
                     <strong>Location:</strong> 
                     <span>{booking.location}</span>
                   </div>
-                  <div className="bm-info-row">
-                    <strong>Guests:</strong> 
-                    <span>{booking.guest_count}</span>
-                  </div>
                   <div className="bm-info-row price">
                     <strong>Total:</strong> 
                     <span>₱{Number(booking.total_amount || booking.Package_Amount).toLocaleString()}</span>
@@ -497,15 +518,9 @@ export default function BookingManagement() {
                   <div className="bm-card-actions">
                     <button 
                       className="bm-btn-edit" 
-                      onClick={() => openEditModal(booking)}
+                      onClick={() => handleViewDetails(booking)}
                     >
-                      Edit Details
-                    </button>
-                    <button 
-                      className="bm-btn-cancel" 
-                      onClick={() => handleCancel(booking.booking_id)}
-                    >
-                      Cancel
+                      View Receipt
                     </button>
                   </div>
                 )}
@@ -703,6 +718,55 @@ export default function BookingManagement() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* View Details Modal */}
+      {viewDetailsModal && selectedBooking && (
+        <div className="bm-modal-overlay" onClick={() => setViewDetailsModal(false)}>
+          <div 
+            className="bm-modal-content" 
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '520px',
+              maxHeight: '90vh',
+              overflowY: 'auto'
+            }}
+          >
+            <div className="bm-modal-header">
+              <h2>Booking Receipt</h2>
+              <button className="bm-close-btn" onClick={() => setViewDetailsModal(false)}>×</button>
+            </div>
+            {/* Show the receipt directly */}
+            <div style={{marginBottom: '24px'}}>
+              <PaymentReceipt receipt={{
+                ...selectedBooking,
+                amount_paid: selectedBooking.total_amount || selectedBooking.Package_Amount,
+                amount_due: 0,
+                payment_date: selectedBooking.event_date,
+                client_name: selectedBooking.client_name || selectedBooking.customer_name,
+                client_phone: selectedBooking.client_phone,
+                client_email: selectedBooking.client_email,
+              }} />
+            </div>
+            {/* Hidden print area for download */}
+            <div id="receipt-print-area" style={{display: 'none'}}>
+              <PaymentReceipt receipt={{
+                ...selectedBooking,
+                amount_paid: selectedBooking.total_amount || selectedBooking.Package_Amount,
+                amount_due: 0,
+                payment_date: selectedBooking.event_date,
+                client_name: selectedBooking.client_name || selectedBooking.customer_name,
+                client_phone: selectedBooking.client_phone,
+                client_email: selectedBooking.client_email,
+              }} />
+            </div>
+            <div style={{display: 'flex', justifyContent: 'flex-end', gap: '12px'}}>
+              <button type="button" className="bm-btn-primary" onClick={handleDownloadReceipt}>
+                Download Receipt
+              </button>
+            </div>
           </div>
         </div>
       )}

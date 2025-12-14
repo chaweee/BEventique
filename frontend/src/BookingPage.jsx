@@ -599,6 +599,18 @@ export default function BookingPage() {
       console.log("Booking creation result:", result);
 
       if (result.status === "success") {
+        // Prefer server-provided customer info; fall back to session-stored user
+        const sessionUser = JSON.parse(sessionStorage.getItem("user") || "{}");
+        const sessionFullName = sessionUser?.firstname && sessionUser?.lastname
+          ? `${sessionUser.firstname} ${sessionUser.lastname}`
+          : sessionUser?.Firstname && sessionUser?.Lastname
+          ? `${sessionUser.Firstname} ${sessionUser.Lastname}`
+          : sessionUser?.Full_Name || sessionUser?.name || null;
+
+        const resolvedName = result.customer_name || sessionFullName || "Guest";
+        const resolvedEmail = result.customer_email || sessionUser?.email || sessionUser?.Email || "";
+        const resolvedPhone = result.customer_phone || sessionUser?.phone || sessionUser?.PhoneNumber || "";
+
         // Store receipt data
         setBookingReceipt({
           booking_id: result.booking_id,
@@ -607,9 +619,9 @@ export default function BookingPage() {
           package_name: result.package_name || packageData.Package_Name || packageData.name,
           package_description: result.package_description || packageData.Description || "",
           package_inclusions: result.package_inclusions || "",
-          customer_name: result.customer_name || "Guest",
-          customer_email: result.customer_email || "",
-          customer_phone: result.customer_phone || "",
+          customer_name: resolvedName,
+          customer_email: resolvedEmail,
+          customer_phone: resolvedPhone,
           designer_id: packageData.Designer_ID || packageData.designer_id
         });
         console.log("Set booking receipt - customer_name:", result.customer_name, "phone:", result.customer_phone);

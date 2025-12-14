@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Canvas as FabricCanvas } from "fabric";
 import "./CustomerPackages.css";
+import bgImage from "./components/assets/bg.jpg"; // updated import
 
 export default function CustomerPackages() {
   const navigate = useNavigate();
@@ -29,8 +30,6 @@ export default function CustomerPackages() {
           
           if (layoutData && typeof layoutData === 'object' && layoutData.objects) {
             console.log("Creating canvas with", layoutData.objects.length, "objects");
-            console.log("Canvas dimensions:", layoutData.width, "x", layoutData.height);
-            console.log("Background color:", layoutData.background);
             
             // Calculate canvas dimensions from objects if not specified
             let canvasWidth = layoutData.width;
@@ -49,7 +48,6 @@ export default function CustomerPackages() {
               });
               canvasWidth = maxX + 100; // Add padding
               canvasHeight = maxY + 100;
-              console.log("Calculated canvas dimensions:", canvasWidth, "x", canvasHeight);
             }
             
             // Create a temporary canvas element and attach to DOM
@@ -81,8 +79,6 @@ export default function CustomerPackages() {
               // Render and convert to image
               fabricCanvas.renderAll();
               
-              console.log("Canvas rendered, objects on canvas:", fabricCanvas.getObjects().length);
-              
               // Small delay to ensure rendering is complete
               setTimeout(() => {
                 try {
@@ -90,8 +86,6 @@ export default function CustomerPackages() {
                     format: 'png',
                     quality: 1
                   });
-                  console.log("Canvas converted to image successfully, data URL length:", dataUrl.length);
-                  console.log("Data URL preview:", dataUrl.substring(0, 100));
                   setCanvasImage(dataUrl);
                 } catch (err) {
                   console.log("Error converting canvas:", err);
@@ -111,7 +105,6 @@ export default function CustomerPackages() {
               }
             });
           } else {
-            console.log("Layout data is invalid or has no objects");
             setCanvasImage(null);
           }
         } catch (e) {
@@ -119,7 +112,6 @@ export default function CustomerPackages() {
           setCanvasImage(null);
         }
       } else {
-        console.log("No package_layout field found");
         setCanvasImage(null);
       }
     } else {
@@ -134,7 +126,6 @@ export default function CustomerPackages() {
       navigate("/login");
       return;
     }
-
     fetchPackages();
   }, [navigate]);
 
@@ -145,8 +136,6 @@ export default function CustomerPackages() {
       if (!response.ok) throw new Error("Failed to fetch packages");
       
       const data = await response.json();
-      console.log("Fetched packages:", data); // Debug log
-      // API returns array directly
       setPackages(Array.isArray(data) ? data : data.packages || []);
       setError(null);
     } catch (err) {
@@ -180,7 +169,6 @@ export default function CustomerPackages() {
       displayPhotos.splice(1, 0, canvasImage);
       return displayPhotos;
     }
-    
     return photos;
   };
 
@@ -205,8 +193,30 @@ export default function CustomerPackages() {
   };
 
   return (
-    <div className="cp-root">
-      <header className="cp-navbar">
+    <div
+      className="cp-root"
+      style={{
+        backgroundImage: `url(${bgImage})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundAttachment: "fixed", // FIX 1: Keeps background fixed during scroll
+        minHeight: "100vh",
+        minWidth: "100vw",
+        position: "relative",
+      }}
+    >
+      {/* Semi-transparent overlay */}
+      <div
+        style={{
+          position: "fixed", // FIX 2: Fixed position so overlay covers entire viewport
+          inset: 0,
+          background: "linear-gradient(rgba(255,255,255,0.65), rgba(255,255,255,0.65))",
+          zIndex: 0,
+          pointerEvents: "none"
+        }}
+      />
+      
+      <header className="cp-navbar" style={{ position: "relative", zIndex: 1 }}>
         <div className="cp-navbar-container">
           <div className="cp-navbar-brand">
             <h1 className="cp-brand-title">Baby's Eventique</h1>
@@ -230,8 +240,9 @@ export default function CustomerPackages() {
         </div>
       </header>
 
-      <main className="cp-main">
-        <section className="cp-content">
+      {/* FIX 3: Added background: "transparent" to override CSS */}
+      <main className="cp-main" style={{ position: "relative", zIndex: 1, background: "transparent" }}>
+        <section className="cp-content cp-content-centered">
           <div className="cp-header">
             <h1>Our Packages</h1>
             <p>Browse and select the perfect package for your event</p>
@@ -245,7 +256,7 @@ export default function CustomerPackages() {
           )}
 
           {!loading && !error && packages.length > 0 && (
-            <div className="cp-grid">
+            <div className="cp-grid cp-grid-centered">
               {packages.map((pkg) => {
                 const packageId = pkg.Package_ID || pkg.id;
                 const packageName = pkg.Package_Name || pkg.name;
@@ -350,35 +361,31 @@ export default function CustomerPackages() {
                 </div>
 
                 <div className="cp-modal-specs">
-                  {selectedPackage.NumTables !== undefined && selectedPackage.NumTables !== null && selectedPackage.NumTables > 0 && (
+                  {selectedPackage.NumTables > 0 && (
                     <div className="cp-spec-item">
                       <span className="cp-spec-label">Tables:</span>
                       <span className="cp-spec-value">{selectedPackage.NumTables}</span>
                     </div>
                   )}
-                  
-                  {selectedPackage.NumRoundTables !== undefined && selectedPackage.NumRoundTables !== null && selectedPackage.NumRoundTables > 0 && (
+                  {selectedPackage.NumRoundTables > 0 && (
                     <div className="cp-spec-item">
                       <span className="cp-spec-label">Round Tables:</span>
                       <span className="cp-spec-value">{selectedPackage.NumRoundTables}</span>
                     </div>
                   )}
-                  
-                  {selectedPackage.NumChairs !== undefined && selectedPackage.NumChairs !== null && selectedPackage.NumChairs > 0 && (
+                  {selectedPackage.NumChairs > 0 && (
                     <div className="cp-spec-item">
                       <span className="cp-spec-label">Chairs:</span>
                       <span className="cp-spec-value">{selectedPackage.NumChairs}</span>
                     </div>
                   )}
-                  
-                  {selectedPackage.NumTent !== undefined && selectedPackage.NumTent !== null && selectedPackage.NumTent > 0 && (
+                  {selectedPackage.NumTent > 0 && (
                     <div className="cp-spec-item">
                       <span className="cp-spec-label">Tents:</span>
                       <span className="cp-spec-value">{selectedPackage.NumTent}</span>
                     </div>
                   )}
-                  
-                  {selectedPackage.NumPlatform !== undefined && selectedPackage.NumPlatform !== null && selectedPackage.NumPlatform > 0 && (
+                  {selectedPackage.NumPlatform > 0 && (
                     <div className="cp-spec-item">
                       <span className="cp-spec-label">Platform:</span>
                       <span className="cp-spec-value">{selectedPackage.NumPlatform}</span>
@@ -410,7 +417,7 @@ export default function CustomerPackages() {
         </div>
       )}
 
-      <footer className="cp-footer">
+      <footer className="cp-footer" style={{ position: "relative", zIndex: 1 }}>
         <div>Contact: events@babys-eventique.ph • +63 917 123 4567</div>
         <div>© 2025 Baby's Eventique</div>
       </footer>
