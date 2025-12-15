@@ -33,6 +33,7 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
   const [includePlatform, setIncludePlatform] = useState(false);
   const canvasContainerRef = useRef(null);
   const fabricCanvasRef = useRef(null);
+  const mouseDownRef = useRef(false);
   const [canvasData, setCanvasData] = useState(null);
   const [canvasReady, setCanvasReady] = useState(false);
   const [itemCounts, setItemCounts] = useState({
@@ -279,6 +280,91 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
       
       canvas.subTargetCheck = true;
       canvas.perPixelTargetFind = true;
+      canvas.isDrawingMode = false;
+      canvas.allowTouchScrolling = false;
+      canvas.selectionFullyContained = false;
+      canvas.skipTargetFind = false;
+      // Ensure selection and cursors are enabled so objects can be moved
+      canvas.selection = true;
+      canvas.hoverCursor = 'move';
+      canvas.defaultCursor = 'default';
+
+      // Debug: log mouse and selection events to help diagnose move issues
+      canvas.on('mouse:down', (opt) => {
+        try {
+          const t = opt?.target;
+          console.debug('canvas mouse:down', t ? `target(${t.type})` : 'no-target', opt);
+          mouseDownRef.current = true;
+          if (t) {
+            // Force-enable selection and movement in case JSON locked them
+            try { t.set({ selectable: true, evented: true, lockMovementX: false, lockMovementY: false }); } catch (e) {}
+            if (t.group) {
+              try { t.group.set({ selectable: true, evented: true, lockMovementX: false, lockMovementY: false }); t.group.setCoords(); } catch (e) {}
+            }
+            if (typeof t.setCoords === 'function') t.setCoords();
+            canvas.setActiveObject(t);
+            canvas.requestRenderAll();
+          } else {
+            canvas.discardActiveObject();
+            canvas.requestRenderAll();
+          }
+        } catch (err) {
+          console.warn('mouse:down handler error', err);
+        }
+      });
+      canvas.on('mouse:move', (opt) => {
+        try {
+          if (mouseDownRef.current) {
+            const active = canvas.getActiveObject();
+            if (active) {
+              // log pointer and active object position to see why drag isn't happening
+              const p = opt.pointer || (opt.e && { x: opt.e.clientX, y: opt.e.clientY });
+              console.debug('mouse:move while down', { pointer: p, active: { id: active?.id, type: active.type, left: active.left, top: active.top } });
+            }
+          }
+        } catch (e) {}
+      });
+      canvas.on('mouse:up', (opt) => { mouseDownRef.current = false; console.debug('canvas mouse:up', opt?.target ? 'target' : 'no-target'); });
+      canvas.on('selection:created', (e) => { console.debug('selection:created', e); });
+      canvas.on('selection:updated', (e) => { console.debug('selection:updated', e); });
+      canvas.on('selection:cleared', (e) => { console.debug('selection:cleared', e); });
+
+      // Ensure canvas elements allow pointer/touch dragging
+      try {
+        if (canvas.upperCanvasEl) canvas.upperCanvasEl.style.touchAction = 'none';
+        if (canvas.lowerCanvasEl) canvas.lowerCanvasEl.style.touchAction = 'none';
+      } catch (e) {}
+
+      // Update canvas data while objects are moving (for immediate persistence)
+      canvas.on('object:moving', (e) => {
+        try {
+          // ensure coordinates are updated while dragging
+          if (e?.target && typeof e.target.setCoords === 'function') e.target.setCoords();
+          setCanvasData(canvas.toJSON());
+        } catch (err) {
+          console.warn('Error serializing canvas during move:', err);
+        }
+      });
+
+      // When an object is selected, ensure it's unlocked and evented
+      canvas.on('object:selected', (e) => {
+        try {
+          const obj = e?.target;
+          if (obj) {
+            try { obj.set({ selectable: true, evented: true, lockMovementX: false, lockMovementY: false }); } catch (e) {}
+            if (obj.type === 'group' || obj.group) {
+              const grp = obj.group || obj;
+              try { grp.set({ selectable: true, evented: true, lockMovementX: false, lockMovementY: false }); grp.forEachObject(c => { try { c.selectable = false; c.evented = false; } catch (e) {} }); grp.setCoords(); } catch (e) {}
+            }
+            if (typeof obj.setCoords === 'function') obj.setCoords();
+            canvas.requestRenderAll();
+          }
+        } catch (err) {
+          console.warn('object:selected handler error', err);
+        }
+      });
+
+      // Also keep object modified/added/removed handlers (existing code expects these)
       fabricCanvasRef.current = canvas;
       setCanvasReady(true);
 
@@ -320,10 +406,44 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
           });
         }
       });
-      
+      // Sanitize any text objects that may have invalid baseline values
+      canvas.getObjects().forEach(obj => {
+        try {
+          if (obj && (obj.type === 'text' || obj.type === 'i-text' || obj.constructor?.name?.toLowerCase().includes('text'))) {
+            if (!obj.textBaseline || obj.textBaseline === 'alphabetical') {
+              try { obj.textBaseline = 'alphabetic'; } catch (e) { /* ignore */ }
+            }
+            if (typeof obj.setCoords === 'function') obj.setCoords();
+          }
+        } catch (e) {}
+      });
+      // Ensure objects/groups are selectable and evented so they can be moved
+      canvas.selection = true;
+      // Ensure loaded objects are selectable and unlocked (do NOT force children non-selectable)
+      canvas.getObjects().forEach(obj => {
+        try {
+          obj.selectable = true;
+          obj.evented = true;
+          obj.hasControls = true;
+          obj.hasBorders = true;
+          obj.lockMovementX = false;
+          obj.lockMovementY = false;
+          obj.lockScalingX = false;
+          obj.lockScalingY = false;
+          if (typeof obj.setCoords === 'function') obj.setCoords();
+        } catch (e) {
+          console.warn('Error configuring object for movement:', e);
+        }
+      });
+
+      // Update JSON while objects are being moved so layout persists
+      canvas.on('object:moving', () => {
+        setCanvasData(canvas.toJSON());
+      });
+
       canvas.renderAll();
       updateItemCounts();
-      console.log('Canvas data loaded and configured');
+      console.log('Canvas data loaded and configured (objects made movable)');
     });
   }, [canvasReady, canvasData, updateItemCounts]);
 
@@ -366,7 +486,14 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
     });
     group.itemType = 'tables';
     fabricCanvasRef.current.add(group);
+    // Ensure newly added group is evented/selectable and unlocked for movement
+    try {
+      group.set({ selectable: true, evented: true, lockMovementX: false, lockMovementY: false });
+      group.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+      group.setCoords();
+    } catch (e) {}
     fabricCanvasRef.current.setActiveObject(group); // Make it selected after adding
+    fabricCanvasRef.current.requestRenderAll();
     updateItemCounts();
   };
   
@@ -407,7 +534,9 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
     });
     group.itemType = 'chairs';
     fabricCanvasRef.current.add(group);
+    try { group.set({ selectable: true, evented: true, lockMovementX: false, lockMovementY: false }); group.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false }); group.setCoords(); } catch (e) {}
     fabricCanvasRef.current.setActiveObject(group);
+    fabricCanvasRef.current.requestRenderAll();
     updateItemCounts();
   };
   
@@ -449,7 +578,9 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
     });
     group.itemType = 'tents';
     fabricCanvasRef.current.add(group);
+    try { group.set({ selectable: true, evented: true, lockMovementX: false, lockMovementY: false }); group.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false }); group.setCoords(); } catch (e) {}
     fabricCanvasRef.current.setActiveObject(group);
+    fabricCanvasRef.current.requestRenderAll();
     updateItemCounts();
   };
   
@@ -491,7 +622,9 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
     });
     group.itemType = 'platforms';
     fabricCanvasRef.current.add(group);
+    try { group.set({ selectable: true, evented: true, lockMovementX: false, lockMovementY: false }); group.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false }); group.setCoords(); } catch (e) {}
     fabricCanvasRef.current.setActiveObject(group);
+    fabricCanvasRef.current.requestRenderAll();
     updateItemCounts();
   };
   
@@ -534,7 +667,9 @@ export default function EditPackageModal({ isOpen, packageId, onClose, onSaved }
     });
     group.itemType = 'roundTables';
     fabricCanvasRef.current.add(group);
+    try { group.set({ selectable: true, evented: true, lockMovementX: false, lockMovementY: false }); group.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false }); group.setCoords(); } catch (e) {}
     fabricCanvasRef.current.setActiveObject(group);
+    fabricCanvasRef.current.requestRenderAll();
     updateItemCounts();
   };
   

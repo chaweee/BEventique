@@ -210,6 +210,7 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
       fill: 'rgba(255, 255, 255, 0.5)',
       left: -12,
       top: -5,
+      textBaseline: 'alphabetic'
     });
     const group = new window.fabric.Group([table, text], {
       left: 100,
@@ -251,6 +252,7 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
       fill: 'rgba(255, 255, 255, 0.5)',
       left: -10,
       top: -4,
+      textBaseline: 'alphabetic'
     });
     const group = new window.fabric.Group([chair, text], {
       left: 150,
@@ -293,6 +295,7 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
       fill: 'rgba(255, 255, 255, 0.5)',
       left: -8,
       top: -5,
+      textBaseline: 'alphabetic'
     });
     const group = new window.fabric.Group([tent, text], {
       left: 200,
@@ -335,6 +338,7 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
       fill: 'rgba(255, 255, 255, 0.5)',
       left: -16,
       top: -4,
+      textBaseline: 'alphabetic'
     });
     const group = new window.fabric.Group([platform, text], {
       left: 250,
@@ -378,6 +382,7 @@ export default function AddPackageModal({ isOpen, onClose, onSaved }) {
       left: -14,
       top: -8,
       textAlign: 'center',
+      textBaseline: 'alphabetic'
     });
     const group = new window.fabric.Group([roundTable, text], {
       left: 180,

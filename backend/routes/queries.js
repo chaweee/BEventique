@@ -1,8 +1,52 @@
+const express = require("express");
+const router = express.Router();
+
+// ============================================================
+// FETCH LAYOUT FROM CUSTOMER'S BOOKING AND SEND TO INQUIRIES
+// POST /api/queries/send-booking-layout
+// ============================================================
+router.post('/send-booking-layout', async (req, res) => {
+    try {
+        const { booking_id, customer_id, thread_id, message } = req.body;
+        if (!booking_id || !customer_id || !thread_id) {
+            return res.status(400).json({ status: 'error', message: 'booking_id, customer_id, and thread_id are required' });
+        }
+
+        // Fetch the custom_layout from the booking
+        const [rows] = await global.db.query('SELECT custom_layout FROM bookings WHERE booking_id = ?', [booking_id]);
+        if (!rows.length || !rows[0].custom_layout) {
+            return res.status(404).json({ status: 'error', message: 'No layout found for this booking.' });
+        }
+        const layout_json = rows[0].custom_layout;
+
+        // Save the layout as a message in the design inquiries (designer_layouts)
+        const insertJsonSql = `
+            INSERT INTO designer_layouts (thread_id, sender_id, message, is_designer, layout_json, created_at)
+            VALUES (?, ?, ?, 0, ?, NOW())
+        `;
+        const [insertResult] = await global.db.query(insertJsonSql, [thread_id, customer_id, message || 'Customer sent booking layout', layout_json]);
+        const designer_layout_id = insertResult.insertId;
+
+        // Optionally, add a message to the design_query_messages table for chat history
+        const msgSql = `
+            INSERT INTO design_query_messages (thread_id, sender_id, message, is_designer, design_revision_id)
+            VALUES (?, ?, ?, 0, ?)
+        `;
+        await global.db.query(msgSql, [thread_id, customer_id, message || 'Customer sent booking layout', designer_layout_id]);
+
+        return res.status(201).json({
+            status: 'success',
+            message: 'Layout sent to inquiries successfully',
+            designer_layout_id
+        });
+    } catch (err) {
+        console.error('Error sending booking layout to inquiries:', err);
+        return res.status(500).json({ status: 'error', message: 'Server error: ' + err.message });
+    }
+});
 // ============================================================
 // DESIGN QUERIES API - Conversation/Support System
 // ============================================================
-const express = require("express");
-const router = express.Router();
 
 /* ============================================================
    CREATE NEW QUERY THREAD
@@ -383,10 +427,11 @@ router.get("/messages/:thread_id", async (req, res) => {
 /* ============================================================
    SEND MESSAGE IN THREAD
    POST /api/queries/message
+   Supports optional `layout_image` (data URL) and `layout_json` fields.
    ============================================================ */
 router.post("/message", async (req, res) => {
     try {
-        const { thread_id, sender_id, message, is_designer } = req.body;
+        const { thread_id, sender_id, message, is_designer, layout_image, layout_json } = req.body;
 
         if (!thread_id || !sender_id || !message) {
             return res.status(400).json({
@@ -395,12 +440,57 @@ router.post("/message", async (req, res) => {
             });
         }
 
+        let revisionId = null;
+
+        // If a layout image (data URL) is provided, save it in the new `designer_layouts` table
+        if (layout_image) {
+            try {
+                // layout_image expected as data URL: data:<mime>;base64,<data>
+                const parts = String(layout_image).split(',');
+                const meta = parts[0] || '';
+                const base64 = parts[1] || parts[0];
+                const mimeMatch = meta.match(/data:(.*);base64/);
+                const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+                const buffer = Buffer.from(base64, 'base64');
+
+                // Insert into designer_layouts: thread_id, sender_id, message, is_designer, layout_json, layout_image, image_mime
+                const insertSql = `
+                    INSERT INTO designer_layouts (thread_id, sender_id, message, is_designer, layout_json, layout_image, image_mime, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+                `;
+                const [insertResult] = await global.db.query(insertSql, [thread_id, sender_id, message || null, is_designer ? 1 : 0, layout_json ? layout_json : null, buffer, mime]);
+                revisionId = insertResult.insertId;
+                console.log('✅ Saved designer layout (designer_layouts.layout_id)=', revisionId);
+            } catch (imgErr) {
+                console.error('❌ Failed to save layout image into designer_layouts:', imgErr?.message || imgErr);
+            }
+        }
+
+        // If only layout_json is provided (customer uploading JSON layout), save it as a layout row
+        if (!revisionId && layout_json) {
+            try {
+                const insertJsonSql = `
+                    INSERT INTO designer_layouts (thread_id, sender_id, message, is_designer, layout_json, created_at)
+                    VALUES (?, ?, ?, ?, ?, NOW())
+                `;
+                const [insertJsonResult] = await global.db.query(insertJsonSql, [thread_id, sender_id, message || 'Customer layout', is_designer ? 1 : 0, layout_json]);
+                revisionId = insertJsonResult.insertId;
+                console.log('✅ Saved designer layout JSON (designer_layouts.layout_id)=', revisionId);
+            } catch (jsonErr) {
+                console.error('❌ Failed to save layout JSON into designer_layouts:', jsonErr?.message || jsonErr);
+            }
+        }
+
+        // Insert message and optionally link design_revision_id
         const sql = `
-            INSERT INTO design_query_messages (thread_id, sender_id, message, is_designer)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO design_query_messages (thread_id, sender_id, message, is_designer, design_revision_id)
+            VALUES (?, ?, ?, ?, ?)
         `;
-        
-        const [result] = await global.db.query(sql, [thread_id, sender_id, message, is_designer || false]);
+
+        // NOTE: we keep using the existing `design_revision_id` column on messages to reference the newly created
+        // `designer_layouts.layout_id` for compatibility with the frontend. If you prefer a new column name,
+        // add it to the `design_query_messages` table and update this query accordingly.
+        const [result] = await global.db.query(sql, [thread_id, sender_id, message, is_designer || false, revisionId]);
         const messageId = result.insertId;
 
         // Update thread's updated_at timestamp
@@ -414,7 +504,7 @@ router.post("/message", async (req, res) => {
 
         // Emit real-time event via Socket.IO
         if (global.io) {
-            global.io.to(`thread_${thread_id}`).emit("new_message", {
+            const payload = {
                 message_id: messageId,
                 thread_id,
                 sender_id,
@@ -423,8 +513,11 @@ router.post("/message", async (req, res) => {
                 Firstname: senderRows[0]?.Firstname,
                 Lastname: senderRows[0]?.Lastname,
                 Email: senderRows[0]?.Email,
-                created_at: new Date()
-            });
+                created_at: new Date(),
+                design_revision_id: revisionId
+            };
+
+            global.io.to(`thread_${thread_id}`).emit("new_message", payload);
 
             // Also emit thread update to refresh thread lists
             global.io.emit("thread_updated", { thread_id });
@@ -432,7 +525,10 @@ router.post("/message", async (req, res) => {
 
         return res.status(201).json({
             status: "success",
-            message: "Message sent successfully"
+            message: "Message sent successfully",
+            message_id: messageId,
+            design_revision_id: revisionId,
+            designer_layout_id: revisionId
         });
 
     } catch (err) {
@@ -441,6 +537,79 @@ router.post("/message", async (req, res) => {
             status: "error",
             message: "Server error: " + err.message
         });
+    }
+});
+
+/* ============================================================
+   GET LAYOUT JSON FOR A DESIGNER LAYOUT OR MESSAGE
+   GET /api/queries/layout/:id/meta
+   ============================================================ */
+router.get('/layout/:id/meta', async (req, res) => {
+    try {
+        const { id } = req.params;
+        // Try designer_layouts table first
+        let [rows] = await global.db.query(
+            `SELECT layout_id, thread_id, sender_id, message, is_designer, layout_json, image_mime, 
+                    OCTET_LENGTH(layout_image) AS image_size, created_at
+             FROM designer_layouts WHERE layout_id = ?`, [id]
+        );
+        if (rows && rows.length > 0 && rows[0].layout_json) {
+            return res.json({ status: 'success', layout: rows[0] });
+        }
+        // Fallback: try design_query_messages for layout_json
+        [rows] = await global.db.query(
+            `SELECT design_revision_id as layout_id, thread_id, sender_id, message, is_designer, layout_json, created_at
+             FROM design_query_messages WHERE design_revision_id = ?`, [id]
+        );
+        if (rows && rows.length > 0 && rows[0].layout_json) {
+            return res.json({ status: 'success', layout: rows[0] });
+        }
+        // Fallback: try bookings.custom_layout (for customer original layout)
+        [rows] = await global.db.query(
+            `SELECT booking_id as layout_id, booking_id as thread_id, customer_id as sender_id, 'Booking custom layout' as message, 0 as is_designer, custom_layout as layout_json, event_date as created_at
+             FROM bookings WHERE booking_id = ?`, [id]
+        );
+        if (rows && rows.length > 0 && rows[0].layout_json) {
+            return res.json({ status: 'success', layout: rows[0] });
+        }
+        return res.status(404).json({ status: 'error', message: 'No layout JSON found for this id.' });
+    } catch (err) {
+        console.error('Error fetching layout meta for id=', req.params.id, err);
+        return res.status(500).json({ status: 'error', message: 'Server error' });
+    }
+});
+
+/* ============================================================
+   SERVE DESIGN REVISION IMAGE
+   GET /api/queries/design_revision/:id/image
+   Streams the LONGBLOB with proper headers for download
+   ============================================================ */
+router.get('/design_revision/:id/image', async (req, res) => {
+    try {
+        const { id } = req.params;
+        // Try reading from designer_layouts (new table)
+        let [rows] = await global.db.query('SELECT layout_image AS image_blob, image_mime FROM designer_layouts WHERE layout_id = ?', [id]);
+        if (rows && rows.length > 0) {
+            const row = rows[0];
+            res.setHeader('Content-Type', row.image_mime || 'image/jpeg');
+            res.setHeader('Content-Disposition', `attachment; filename="layout_${id}.jpg"`);
+            return res.send(row.image_blob);
+        }
+
+        // Fallback: check old design_revisions table if present
+        [rows] = await global.db.query('SELECT image_blob, image_mime FROM design_revisions WHERE revision_id = ?', [id]);
+        if (rows && rows.length > 0) {
+            const row = rows[0];
+            res.setHeader('Content-Type', row.image_mime || 'image/jpeg');
+            res.setHeader('Content-Disposition', `attachment; filename="layout_${id}.jpg"`);
+            return res.send(row.image_blob);
+        }
+
+        console.warn(`Layout image not found for id=${id} in designer_layouts or design_revisions`);
+        return res.status(404).send('Not found');
+    } catch (err) {
+        console.error('Error serving designer layout image:', err);
+        res.status(500).send('Server error');
     }
 });
 
@@ -467,7 +636,7 @@ router.patch("/status/:thread_id", async (req, res) => {
             status: "success",
             message: "Status updated successfully"
         });
-
+        
     } catch (err) {
         console.error("Update status error:", err);
         return res.status(500).json({

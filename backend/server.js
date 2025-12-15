@@ -83,6 +83,19 @@ app.use("/uploads", express.static(__dirname + "/uploads"));
         }
     }
 
+    // Database migration - add design_revision_id to design_query_messages if missing
+    try {
+        await db.query(`
+            ALTER TABLE design_query_messages ADD COLUMN design_revision_id INT NULL
+        `);
+        console.log("✅ Added design_revision_id column to design_query_messages");
+    } catch (err) {
+        // If column exists, ignore
+        if (err && err.code !== 'ER_DUP_FIELDNAME' && err.message && !err.message.includes('Duplicate')) {
+            console.log("ℹ️ design_revision_id column may already exist or other error:", err.message);
+        }
+    }
+
     // Test route
     app.get("/api/test", (req, res) => {
         res.json({ message: "API is working!", timestamp: new Date().toISOString() });

@@ -2,35 +2,42 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import Swal from "sweetalert2";
-import "./CustomerDesignQueries.css"; // Ensure this matches the CSS file name
+import "./CustomerDesignQueries.css";
 
 export default function CustomerDesignQueries() {
   const navigate = useNavigate();
-  
   // Data States
   const [queries, setQueries] = useState([]);
   const [selectedQuery, setSelectedQuery] = useState(null);
   const [messages, setMessages] = useState([]);
   const [bookings, setBookings] = useState([]);
-  
   // UI States
   const [loading, setLoading] = useState(false);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [bookingsLoading, setBookingsLoading] = useState(false);
   const [showNewQueryModal, setShowNewQueryModal] = useState(false);
   const [replyMessage, setReplyMessage] = useState("");
-  const [sendingReply, setSendingReply] = useState(false);
-  
   // Refs
-  const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
-
+  const socketRef = useRef(null);
   // Form State
   const [newQueryForm, setNewQueryForm] = useState({
     booking_id: "",
     message: "",
     recipient_type: "admin"
   });
+  const [sendingReply, setSendingReply] = useState(false);
+
+  // Layout modal state
+  const [showLayoutModal, setShowLayoutModal] = useState(false);
+  const [selectedLayoutBooking, setSelectedLayoutBooking] = useState("");
+  const [sendingLayout, setSendingLayout] = useState(false);
+  const [layoutBookings, setLayoutBookings] = useState([]);
+
+  // Layout JSON view/edit state
+  const [viewingLayoutJson, setViewingLayoutJson] = useState(null);
+  const [editingLayoutJson, setEditingLayoutJson] = useState(null);
+  const [editingLayoutId, setEditingLayoutId] = useState(null);
 
   // --- Helpers ---
   const getClientId = () => {
@@ -43,57 +50,43 @@ export default function CustomerDesignQueries() {
   };
 
   // --- Effects ---
-
-  // 1. Initial Load & Socket
   useEffect(() => {
     fetchQueries();
-
-    // Socket Connection
     socketRef.current = io("http://localhost:3001", {
       transports: ["websocket"],
       reconnection: true,
       autoConnect: true
     });
-
     socketRef.current.on("connect", () => {
-      console.log("✅ Socket connected");
       fetchQueries();
     });
-
-    // Listen for incoming messages (Real-time update)
     socketRef.current.on("receive_message", (data) => {
       if (selectedQuery && data.thread_id === selectedQuery.query_id) {
         setMessages((prev) => [...prev, data]);
       }
-      // Refresh thread list to show new message preview
       fetchQueries();
     });
-
     return () => {
       socketRef.current?.disconnect();
     };
     // eslint-disable-next-line
-  }, [selectedQuery]); // Re-bind if selectedQuery changes
+  }, [selectedQuery]);
 
-  // 2. Auto-scroll when messages change
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  // 3. Fetch bookings when modal opens
   useEffect(() => {
     if (showNewQueryModal) fetchBookings();
   }, [showNewQueryModal]);
 
   // --- API Calls ---
-
   const fetchQueries = async () => {
     setLoading(true);
     try {
       const clientId = getClientId();
       const res = await fetch(`http://localhost:3001/api/queries/customer/${clientId}`);
       const data = await res.json();
-      
       if (data.status === "success") {
         const mappedQueries = (data.threads || []).map(thread => ({
           query_id: thread.thread_id,
@@ -145,21 +138,17 @@ export default function CustomerDesignQueries() {
   };
 
   // --- Handlers ---
-
   const handleSelectQuery = (query) => {
     setSelectedQuery(query);
     setReplyMessage("");
     setMessages([]);
     fetchMessages(query.query_id);
-    
-    // Join socket room if your backend supports rooms
-    // socketRef.current.emit('join_thread', query.query_id); 
+    // socketRef.current.emit('join_thread', query.query_id);
   };
 
   const handleSendReply = async (e) => {
     e.preventDefault();
     if (!replyMessage.trim() || !selectedQuery) return;
-    
     setSendingReply(true);
     try {
       const clientId = getClientId();
@@ -173,12 +162,11 @@ export default function CustomerDesignQueries() {
           is_designer: false
         })
       });
-      
       const data = await res.json();
       if (data.status === "success") {
         setReplyMessage("");
         fetchMessages(selectedQuery.query_id);
-        fetchQueries(); // Update preview in sidebar
+        fetchQueries();
       }
     } catch (err) {
       console.error("Error sending reply:", err);
@@ -189,7 +177,6 @@ export default function CustomerDesignQueries() {
 
   const handleCreateQuery = async (e) => {
     e.preventDefault();
-    
     try {
       const clientId = getClientId();
       const res = await fetch("http://localhost:3001/api/queries/create-thread", {
@@ -203,16 +190,11 @@ export default function CustomerDesignQueries() {
           recipient_type: newQueryForm.recipient_type
         })
       });
-      
       const data = await res.json();
       if (data.status === "success") {
         setShowNewQueryModal(false);
         const threadId = data.thread_id;
-        const savedMessage = newQueryForm.message;
-        const savedSubject = newQueryForm.recipient_type === "designer" ? "Customer Inquiry - Designer" : "Customer Inquiry - Admin";
-        
         setNewQueryForm({ booking_id: "", message: "", recipient_type: "admin" });
-        
         Swal.fire({
           icon: "success",
           title: "Sent!",
@@ -220,12 +202,9 @@ export default function CustomerDesignQueries() {
           timer: 2000,
           showConfirmButton: false
         });
-        
-        // Fetch the thread details from the backend to get complete data
         try {
           const threadRes = await fetch(`http://localhost:3001/api/queries/customer/${getClientId()}`);
           const threadData = await threadRes.json();
-          
           if (threadData.status === "success") {
             const threads = (threadData.threads || []).map(thread => ({
               query_id: thread.thread_id,
@@ -236,23 +215,188 @@ export default function CustomerDesignQueries() {
               event_type: thread.event_type,
               event_date: thread.event_date
             }));
-            
             setQueries(threads);
-            
-            // Find and select the newly created thread
             const newThread = threads.find(t => t.query_id === threadId);
             if (newThread) {
               handleSelectQuery(newThread);
             }
           }
         } catch (err) {
-          console.error("Error fetching updated threads:", err);
-          fetchQueries(); // Fallback to regular fetch
+          fetchQueries();
         }
       } else {
         Swal.fire("Error", data.message || "Failed to create query", "error");
       }
     } catch (err) {
+      Swal.fire("Error", "Network error", "error");
+    }
+  };
+
+  // Layout modal logic
+  const handleSendLayoutToDesigner = async () => {
+    setSelectedLayoutBooking("");
+    setShowLayoutModal(true);
+    try {
+      const clientId = getClientId();
+      const res = await fetch(`http://localhost:3001/api/bookings/my-bookings/${clientId}`);
+      const data = await res.json();
+      if (data.status === "success") {
+        setLayoutBookings((data.bookings || []).filter(b => b.status === "confirmed"));
+      } else {
+        setLayoutBookings([]);
+      }
+    } catch {
+      setLayoutBookings([]);
+    }
+  };
+
+  const handleSendLayout = async (e) => {
+    e.preventDefault();
+    if (!selectedLayoutBooking || !selectedQuery) return;
+    setSendingLayout(true);
+    try {
+      const clientId = getClientId();
+      // Fetch the booking to get custom_layout
+      const booking = layoutBookings.find(b => b.booking_id.toString() === selectedLayoutBooking);
+      let customLayout = booking?.custom_layout;
+      if (!customLayout) {
+        const res = await fetch(`http://localhost:3001/api/bookings/my-bookings/${clientId}`);
+        const data = await res.json();
+        if (data.status === "success") {
+          const found = (data.bookings || []).find(b => b.booking_id.toString() === selectedLayoutBooking);
+          customLayout = found?.custom_layout;
+        }
+      }
+      if (!customLayout) {
+        Swal.fire("Error", "No custom layout found for this booking.", "error");
+        setSendingLayout(false);
+        return;
+      }
+      const res = await fetch("http://localhost:3001/api/queries/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          thread_id: selectedQuery.query_id,
+          sender_id: clientId,
+          message: "Customer sent booking layout",
+          is_designer: false,
+          layout_json: customLayout
+        })
+      });
+      const data = await res.json();
+      if (data.status === "success") {
+        setShowLayoutModal(false);
+        fetchMessages(selectedQuery.query_id);
+        fetchQueries();
+        Swal.fire({
+          icon: "success",
+          title: "Layout Sent!",
+          text: "Your layout has been sent.",
+          timer: 2000,
+          showConfirmButton: false
+        });
+      } else {
+        Swal.fire("Error", data.message || "Failed to send layout", "error");
+      }
+    } catch (err) {
+      Swal.fire("Error", "Network error", "error");
+    } finally {
+      setSendingLayout(false);
+    }
+  };
+
+  // Download layout image or JSON
+  const handleDownloadLayout = async (layoutId) => {
+    try {
+      let res = await fetch(`http://localhost:3001/api/queries/design_revision/${layoutId}/image`);
+      if (res.ok) {
+        const blob = await res.blob();
+        if (blob && blob.size > 0) {
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `layout_${layoutId}.jpg`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+          return;
+        }
+      }
+      res = await fetch(`http://localhost:3001/api/queries/layout/${layoutId}/meta`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.layout && data.layout.layout_json) {
+          const jsonStr = typeof data.layout.layout_json === "string"
+            ? data.layout.layout_json
+            : JSON.stringify(data.layout.layout_json, null, 2);
+          const blob = new Blob([jsonStr], { type: "application/json" });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `layout_${layoutId}.json`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+          return;
+        }
+      }
+      Swal.fire("Error", "No layout file found for this booking.", "error");
+    } catch (err) {
+      Swal.fire("Error", "Failed to download layout file", "error");
+    }
+  };
+
+  // Layout JSON view/edit handlers
+  const handleViewLayoutJson = async (layoutId, editable) => {
+    try {
+      const res = await fetch(`http://localhost:3001/api/queries/layout/${layoutId}/meta`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.layout && data.layout.layout_json) {
+          if (editable) {
+            setEditingLayoutJson(data.layout.layout_json);
+            setEditingLayoutId(layoutId);
+          } else {
+            setViewingLayoutJson(data.layout.layout_json);
+          }
+        } else {
+          Swal.fire("Error", "No layout JSON found.", "error");
+        }
+      } else {
+        Swal.fire("Error", "Failed to fetch layout JSON.", "error");
+      }
+    } catch {
+      Swal.fire("Error", "Failed to fetch layout JSON.", "error");
+    }
+  };
+
+  const handleSaveEditedLayout = async () => {
+    if (!editingLayoutJson || !selectedQuery) return;
+    try {
+      const clientId = getClientId();
+      const res = await fetch("http://localhost:3001/api/queries/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          thread_id: selectedQuery.query_id,
+          sender_id: clientId,
+          message: "Updated layout from designer",
+          is_designer: true,
+          layout_json: editingLayoutJson
+        })
+      });
+      const data = await res.json();
+      if (data.status === "success") {
+        setEditingLayoutJson(null);
+        setEditingLayoutId(null);
+        fetchMessages(selectedQuery.query_id);
+        Swal.fire("Success", "Layout sent to customer.", "success");
+      } else {
+        Swal.fire("Error", data.message || "Failed to send layout", "error");
+      }
+    } catch {
       Swal.fire("Error", "Network error", "error");
     }
   };
@@ -278,18 +422,15 @@ export default function CustomerDesignQueries() {
 
       <main className="cdq-main">
         <div className="cdq-messenger">
-          
-          {/* Sidebar - Hidden on mobile if a query is selected */}
+          {/* Sidebar */}
           <aside className={`cdq-sidebar ${selectedQuery ? 'mobile-hidden' : ''}`} 
                  style={window.innerWidth <= 768 && selectedQuery ? { display: 'none' } : { display: 'flex' }}>
-            
             <div className="cdq-sidebar-header">
               <h2>Messages</h2>
               <button className="cdq-new-btn" onClick={() => setShowNewQueryModal(true)} title="New Message">
                 +
               </button>
             </div>
-
             <div className="cdq-thread-list">
               {loading ? (
                 <div style={{padding: '2rem', textAlign: 'center', color: '#888'}}>Loading chats...</div>
@@ -322,10 +463,9 @@ export default function CustomerDesignQueries() {
             </div>
           </aside>
 
-          {/* Conversation Area - Hidden on mobile if NO query is selected */}
+          {/* Conversation Area */}
           <div className={`cdq-conversation ${!selectedQuery ? 'mobile-hidden' : ''}`}
                style={window.innerWidth <= 768 && !selectedQuery ? { display: 'none' } : { display: 'flex' }}>
-            
             {!selectedQuery ? (
               <div className="cdq-no-selection">
                 <div className="empty-icon">💬</div>
@@ -340,7 +480,15 @@ export default function CustomerDesignQueries() {
                       {selectedQuery.event_type} • {new Date(selectedQuery.event_date).toLocaleDateString()}
                     </p>
                   </div>
-                  {/* Close button acts as 'Back' on mobile */}
+                  {selectedQuery.subject?.includes('Designer') && (
+                    <button
+                      className="cdq-send-layout-btn"
+                      style={{ marginRight: 12, background: '#0ea5a4', color: 'white', border: 'none', borderRadius: 6, padding: '6px 14px', fontWeight: 600, cursor: 'pointer' }}
+                      onClick={handleSendLayoutToDesigner}
+                    >
+                      Send Layout from Booking
+                    </button>
+                  )}
                   <button className="cdq-close-conv" onClick={() => setSelectedQuery(null)}>✕</button>
                 </div>
 
@@ -351,14 +499,12 @@ export default function CustomerDesignQueries() {
                     messages.map((msg, index) => {
                       const clientId = getClientId();
                       const isMe = msg.sender_id === parseInt(clientId);
-                      const isAdmin = msg.sender_id === null; // Assuming null sender_id is admin
-                      
-                      // Determine class based on role
-                      let msgClass = "customer"; // Default (Me)
+                      let msgClass = "customer";
                       if (!isMe) {
                         msgClass = msg.is_designer ? "designer" : "admin";
                       }
-
+                      const layoutId = msg.design_revision_id || msg.designer_layout_id;
+                      const hasLayout = !!layoutId;
                       return (
                         <div key={index} className={`cdq-message ${msgClass}`}>
                           <span className="message-time">
@@ -370,7 +516,45 @@ export default function CustomerDesignQueries() {
                                 {isMe ? "You" : (msg.is_designer ? "Designer" : "Admin")}
                               </strong>
                             </div>
-                            <div className="message-text">{msg.message}</div>
+                            <div className="message-text">
+                              {msg.message}
+                              {hasLayout && (
+                                <div style={{ marginTop: 8 }}>
+                                  <a
+                                    href="#"
+                                    style={{ color: "#0ea5a4", textDecoration: "underline", fontWeight: 500, marginRight: 12 }}
+                                    onClick={e => {
+                                      e.preventDefault();
+                                      handleDownloadLayout(layoutId);
+                                    }}
+                                  >
+                                    Download layout
+                                  </a>
+                                  <a
+                                    href="#"
+                                    style={{ color: "#0ea5a4", textDecoration: "underline", fontWeight: 500, marginRight: 12 }}
+                                    onClick={e => {
+                                      e.preventDefault();
+                                      handleViewLayoutJson(layoutId, false);
+                                    }}
+                                  >
+                                    View JSON
+                                  </a>
+                                  {msg.is_designer !== true && (
+                                    <a
+                                      href="#"
+                                      style={{ color: "#0ea5a4", textDecoration: "underline", fontWeight: 500 }}
+                                      onClick={e => {
+                                        e.preventDefault();
+                                        handleViewLayoutJson(layoutId, true);
+                                      }}
+                                    >
+                                      Edit & Send Back
+                                    </a>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -410,7 +594,6 @@ export default function CustomerDesignQueries() {
               <h2>New Inquiry</h2>
               <button className="cdq-close-btn" onClick={() => setShowNewQueryModal(false)}>×</button>
             </div>
-            
             <form onSubmit={handleCreateQuery} className="cdq-form">
               <div className="cdq-form-group">
                 <label>Related Booking</label>
@@ -418,10 +601,8 @@ export default function CustomerDesignQueries() {
                   value={newQueryForm.booking_id}
                   onChange={(e) => {
                     const bId = e.target.value;
-                    // Auto-suggest recipient based on booking status
                     const booking = bookings.find(b => b.booking_id.toString() === bId);
                     const type = booking?.status === 'confirmed' ? 'designer' : 'admin';
-                    
                     setNewQueryForm({
                       ...newQueryForm,
                       booking_id: bId,
@@ -438,7 +619,6 @@ export default function CustomerDesignQueries() {
                   ))}
                 </select>
               </div>
-
               <div className="cdq-form-group">
                 <label>Send To</label>
                 <select
@@ -449,7 +629,6 @@ export default function CustomerDesignQueries() {
                   <option value="designer">🎨 Designer (Themes, Colors, Layouts)</option>
                 </select>
               </div>
-
               <div className="cdq-form-group">
                 <label>Message</label>
                 <textarea
@@ -464,12 +643,92 @@ export default function CustomerDesignQueries() {
                   rows="4"
                 />
               </div>
-
               <div className="cdq-modal-actions">
                 <button type="button" className="cdq-cancel-btn" onClick={() => setShowNewQueryModal(false)}>Cancel</button>
                 <button type="submit" className="cdq-submit-btn">Send Message</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Layout Modal */}
+      {showLayoutModal && (
+        <div className="cdq-modal-overlay" onClick={() => setShowLayoutModal(false)}>
+          <div className="cdq-modal" onClick={e => e.stopPropagation()}>
+            <div className="cdq-modal-header">
+              <h2>Send Layout to Designer</h2>
+              <button className="cdq-close-btn" onClick={() => setShowLayoutModal(false)}>×</button>
+            </div>
+            <form className="cdq-form" onSubmit={handleSendLayout}>
+              <div className="cdq-form-group">
+                <label>Select Booking</label>
+                <select
+                  value={selectedLayoutBooking}
+                  onChange={e => setSelectedLayoutBooking(e.target.value)}
+                  required
+                >
+                  <option value="">Select confirmed booking...</option>
+                  {layoutBookings.map(b => (
+                    <option key={b.booking_id} value={b.booking_id}>
+                      {b.Package_Name || 'No Package'} • {b.event_type} • {new Date(b.event_date).toLocaleDateString()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="cdq-modal-actions">
+                <button type="button" className="cdq-cancel-btn" onClick={() => setShowLayoutModal(false)}>Cancel</button>
+                <button type="submit" className="cdq-submit-btn" disabled={!selectedLayoutBooking || sendingLayout}>
+                  {sendingLayout ? "Sending..." : "Send"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Layout JSON Viewer Modal */}
+      {viewingLayoutJson && (
+        <div className="cdq-modal-overlay" onClick={() => setViewingLayoutJson(null)}>
+          <div className="cdq-modal" onClick={e => e.stopPropagation()}>
+            <div className="cdq-modal-header">
+              <h2>Layout JSON</h2>
+              <button className="cdq-close-btn" onClick={() => setViewingLayoutJson(null)}>×</button>
+            </div>
+            <pre style={{ maxHeight: 400, overflow: "auto", background: "#f5f5f5", padding: 12 }}>
+              {typeof viewingLayoutJson === "string"
+                ? viewingLayoutJson
+                : JSON.stringify(viewingLayoutJson, null, 2)}
+            </pre>
+          </div>
+        </div>
+      )}
+
+      {/* Layout JSON Editor Modal (for designer) */}
+      {editingLayoutJson && (
+        <div className="cdq-modal-overlay" onClick={() => { setEditingLayoutJson(null); setEditingLayoutId(null); }}>
+          <div className="cdq-modal" onClick={e => e.stopPropagation()}>
+            <div className="cdq-modal-header">
+              <h2>Edit Layout JSON</h2>
+              <button className="cdq-close-btn" onClick={() => { setEditingLayoutJson(null); setEditingLayoutId(null); }}>×</button>
+            </div>
+            <textarea
+              style={{ width: "100%", minHeight: 200, fontFamily: "monospace" }}
+              value={typeof editingLayoutJson === "string" ? editingLayoutJson : JSON.stringify(editingLayoutJson, null, 2)}
+              onChange={e => setEditingLayoutJson(e.target.value)}
+            />
+            <div className="cdq-modal-actions">
+              <button className="cdq-cancel-btn" onClick={() => { setEditingLayoutJson(null); setEditingLayoutId(null); }}>Cancel</button>
+              <button
+                className="cdq-submit-btn"
+                onClick={e => {
+                  e.preventDefault();
+                  handleSaveEditedLayout();
+                }}
+              >
+                Send Back to Customer
+              </button>
+            </div>
           </div>
         </div>
       )}
