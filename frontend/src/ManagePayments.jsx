@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
-import PaymentReceipt from "./components/PaymentReceipt";
-import { downloadDomAsImage } from "./lib/downloadDomAsImage";
+import React, { useState, useEffect } from "react";
+// Removed PaymentReceipt import
+// import { downloadDomAsImage } from "./lib/downloadDomAsImage";
 
 // Custom Modal for payment input
 function PaymentModal({ open, onClose, onSubmit, booking }) {
@@ -128,16 +128,44 @@ function AddPaymentButton({ onClick }) {
   );
 }
 
+// Success Modal
+function SuccessModal({ open, onClose }) {
+  if (!open) return null;
+  return (
+    <div style={{
+      position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+      background: "rgba(0,0,0,0.45)", zIndex: 1400,
+      display: "flex", alignItems: "center", justifyContent: "center"
+    }}>
+      <div style={{
+        background: "#fff", borderRadius: 16, padding: 32, minWidth: 300, maxWidth: 400,
+        boxShadow: "0 8px 32px #0002", textAlign: "center", position: "relative"
+      }}>
+        <h2 style={{margin: 0, marginBottom: 18, color: "#22c55e"}}>Payment Successful</h2>
+        <div style={{marginTop: 24, display: "flex", gap: 16, justifyContent: "center"}}>
+          <button
+            style={{
+              background: "#e5e7eb", color: "#374151", border: "none", borderRadius: 8,
+              padding: "10px 24px", fontWeight: 600, fontSize: 16, cursor: "pointer"
+            }}
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ManagePayments() {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(false);
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
-  // Receipt state
-  const [showReceipt, setShowReceipt] = useState(false);
-  const [receiptData, setReceiptData] = useState(null);
-  const receiptRef = useRef(null);
+  // Success modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
     fetchPayments();
@@ -148,7 +176,16 @@ export default function ManagePayments() {
       setLoading(true);
       const res = await fetch("http://localhost:3001/api/admin/payments");
       const data = await res.json();
-      if (data.status === "success") setPayments(data.payments);
+      if (data.status === "success") {
+        // normalize payments: compute total, paid and remaining due
+        const normalized = (data.payments || []).map(p => {
+          const total = Number(p.total_amount ?? p.Package_Amount ?? p.amount_due ?? 0);
+          const paid = Number(p.amount_paid ?? 0);
+          const due = Math.max(0, total - paid);
+          return { ...p, total_amount: total, amount_paid: paid, amount_due: due };
+        });
+        setPayments(normalized);
+      }
       setLoading(false);
     } catch (err) { console.error(err); setLoading(false); }
   };
@@ -159,10 +196,12 @@ export default function ManagePayments() {
     setModalOpen(true);
   };
 
-  // After payment, show receipt modal
+  // After payment, show success modal
   const handleModalSubmit = async (amount, customer) => {
     try {
-      const res = await fetch(`http://localhost:3001/api/admin/payments/${selectedBooking.booking_id}/add`, {
+      // preserve booking before clearing UI state
+      const booking = selectedBooking;
+      const res = await fetch(`http://localhost:3001/api/admin/payments/${booking.booking_id}/add`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount, ...customer })
@@ -171,14 +210,19 @@ export default function ManagePayments() {
       setModalOpen(false);
       setSelectedBooking(null);
       if (data.status === "success") {
-        // Compose receipt data
-        setReceiptData({
-          ...selectedBooking,
-          ...customer,
-          amount_paid: amount,
-          payment_date: new Date().toISOString(),
-        });
-        setShowReceipt(true);
+        // update local payments immediately
+        setPayments(prev => prev.map(p => {
+          if (p.booking_id === booking.booking_id) {
+            const newPaid = Number(p.amount_paid || 0) + Number(amount);
+            const newDue = Math.max(0, Number(p.amount_due || 0) - Number(amount));
+            return { ...p, amount_paid: newPaid, amount_due: newDue };
+          }
+          return p;
+        }));
+
+        // show success modal
+        setShowSuccessModal(true);
+        // refresh from server to keep data in sync
         fetchPayments();
       } else {
         alert(data.message || "Failed to add payment.");
@@ -187,13 +231,6 @@ export default function ManagePayments() {
       setModalOpen(false);
       setSelectedBooking(null);
       alert("Server error.");
-    }
-  };
-
-  // Download receipt as image
-  const handleDownloadReceipt = async () => {
-    if (receiptRef.current) {
-      await downloadDomAsImage(receiptRef.current, `receipt_${receiptData?.booking_id || ''}.jpg`);
     }
   };
 
@@ -214,7 +251,8 @@ export default function ManagePayments() {
         </thead>
         <tbody>
           {payments.map(p => {
-            const isPaid = Number(p.amount_paid || 0) >= Number(p.amount_due || 0);
+            // Consider booking paid when remaining amount_due is zero
+            const isPaid = Number(p.amount_due || 0) <= 0;
             return (
               <tr key={p.booking_id}>
                 <td>#{p.booking_id}</td>
@@ -241,7 +279,7 @@ export default function ManagePayments() {
                   </span>
                 </td>
                 <td>
-                  {/* Always render the cell, but only show button if not paid */}
+                  {/* Always render the cell, but only show add button if not paid */}
                   {!isPaid ? (
                     <AddPaymentButton onClick={() => handleAddPayment(p)} />
                   ) : (
@@ -267,35 +305,10 @@ export default function ManagePayments() {
         onSubmit={handleModalSubmit}
         booking={selectedBooking}
       />
-      {/* Receipt Modal */}
-      {showReceipt && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(0,0,0,0.45)", zIndex: 1400,
-          display: "flex", alignItems: "center", justifyContent: "center"
-        }}>
-          <div style={{background: '#fff', borderRadius: 16, padding: 32, minWidth: 480, maxWidth: 600, boxShadow: '0 8px 32px #0002', textAlign: 'center', position: 'relative'}}>
-            <h2 style={{margin: 0, marginBottom: 18, color: '#8b4513'}}>Payment Receipt</h2>
-            <div ref={receiptRef} style={{display: 'flex', justifyContent: 'center'}}>
-              <PaymentReceipt receipt={receiptData} />
-            </div>
-            <div style={{marginTop: 24, display: 'flex', gap: 16, justifyContent: 'center'}}>
-              <button
-                style={{background: '#a0522d', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 600, fontSize: 16, cursor: 'pointer'}}
-                onClick={handleDownloadReceipt}
-              >
-                Download Receipt
-              </button>
-              <button
-                style={{background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 600, fontSize: 16, cursor: 'pointer'}}
-                onClick={() => { setShowReceipt(false); setReceiptData(null); }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SuccessModal
+        open={showSuccessModal}
+        onClose={() => { setShowSuccessModal(false); /* no receipt state to clear */ }}
+      />
     </div>
   );
 }

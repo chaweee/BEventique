@@ -279,22 +279,6 @@ export default function AdminDashboardPage() {
           </div>
 
 
-          {/* === MIDDLE: SCHEDULER === */}
-          <div style={{ marginBottom: '24px' }}>
-            <div style={{ ...cardStyle, height: '600px', overflow: 'auto' }}>
-              <h4 style={{ marginBottom: 20, color: '#111827', fontWeight: 600 }}>Event Scheduler</h4>
-              <Calendar
-                localizer={localizer}
-                events={calendarEvents}
-                startAccessor="start"
-                endAccessor="end"
-                style={{ height: 500 }}
-                views={['month', 'week', 'day']}
-              />
-            </div>
-          </div>
-
-
           {/* === ROW 2: Revenue & Customer Charts === */}
           <div className="chart-row-bottom" style={chartRowStyle}>
             {/* 3. Net Revenue */}

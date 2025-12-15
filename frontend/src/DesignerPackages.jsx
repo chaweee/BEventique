@@ -125,7 +125,7 @@ export default function DesignerPackages() {
 
 	// render: show list OR editor
 	return (
-		<div className="dp-root">
+		<div className="dq-root">
 			{/* Sidebar copied from DesignerQueries */}
 			<DesignerSidebar onLogout={handleLogout} />
 

@@ -95,7 +95,7 @@ export default function ManageEvent() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
-  const [filterDate, setFilterDate] = useState("");
+  const [filterDate, setFilterDate] = useState(null);
   const [bookedDates, setBookedDates] = useState([]);
 
   // Edit modal state and handlers
@@ -189,11 +189,18 @@ export default function ManageEvent() {
       const res = await fetch("http://localhost:3001/api/bookings/all");
       const data = await res.json();
       if (data.status === "success") {
-        setBookings(data.bookings);
+        // normalize bookings: compute total, paid and remaining due
+        const normalized = (data.bookings || []).map(b => {
+          const total = Number(b.total_amount ?? b.Package_Amount ?? b.total_price ?? 0);
+          const paid = Number(b.amount_paid ?? 0);
+          const due = Math.max(0, total - paid);
+          return { ...b, total_amount: total, amount_paid: paid, amount_due: due };
+        });
+        setBookings(normalized);
 
-        // Auto-confirm bookings with paid payment_status
-        data.bookings.forEach(async (b) => {
-          if (b.payment_status === "paid" && b.status !== "confirmed") {
+        // Auto-confirm bookings only when remaining due is zero
+        normalized.forEach(async (b) => {
+          if (Number(b.amount_due) <= 0 && b.status !== "confirmed") {
             try {
               await fetch(`http://localhost:3001/api/bookings/status/${b.booking_id}`, {
                 method: "PATCH",
@@ -201,7 +208,6 @@ export default function ManageEvent() {
                 body: JSON.stringify({ status: "confirmed" })
               });
             } catch (err) {
-              // Optionally log error, but don't block UI
               console.error("Auto-confirm booking failed", err);
             }
           }
@@ -217,8 +223,8 @@ export default function ManageEvent() {
     // Filter by search query (customer name)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(b => 
-        b.client_name.toLowerCase().includes(query)
+      filtered = filtered.filter(b =>
+        (b.client_name || "").toLowerCase().includes(query)
       );
     }
 
@@ -227,12 +233,12 @@ export default function ManageEvent() {
       filtered = filtered.filter(b => b.status === filterStatus);
     }
 
-    // Filter by date
+    // Filter by date (filterDate is Dayjs or null)
     if (filterDate) {
+      const sel = filterDate.format("YYYY-MM-DD");
       filtered = filtered.filter(b => {
-        const bookingDate = new Date(b.event_date).toLocaleDateString();
-        const selectedDate = new Date(filterDate).toLocaleDateString();
-        return bookingDate === selectedDate;
+        const bookingDate = dayjs(b.event_date).format("YYYY-MM-DD");
+        return bookingDate === sel;
       });
     }
 
@@ -242,6 +248,20 @@ export default function ManageEvent() {
   const updateStatus = async (id, newStatus) => {
     // Use window.confirm and CustomAlert instead of SwalLib
     try {
+      // validate booking exists and amount due when confirming
+      const booking = bookings.find(b => b.booking_id === id);
+      if (!booking) {
+        setAlert({ open: true, type: "error", message: "Booking not found." });
+        return;
+      }
+      if (newStatus === "confirmed") {
+        const due = Number(booking.amount_due ?? Math.max(0, (Number(booking.total_amount ?? booking.Package_Amount ?? 0) - Number(booking.amount_paid ?? 0))));
+        if (due > 0) {
+          setAlert({ open: true, type: "error", message: "Cannot confirm booking: amount due must be 0." });
+          return;
+        }
+      }
+
       const confirmed = window.confirm(
         `Mark this booking as "${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}"?`
       );
@@ -277,246 +297,195 @@ export default function ManageEvent() {
     }
   };
 
+  const handleSearch = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const handleFilterStatus = (e) => {
+    setFilterStatus(e.target.value);
+  };
+
+  const handleFilterDate = (newValue) => {
+    // newValue is a Dayjs object or null
+    setFilterDate(newValue);
+  };
+
+  const isDateBooked = (date) => {
+    return bookedDates.some(bd => dayjs(bd).isSame(date, 'day'));
+  };
+
   return (
-    <div className="table-container">
-      {/* Filters and Search Bar */}
-      <div className="filters-section">
-        <div className="search-bar">
-          <Search size={20} />
-          <input
-            type="text"
-            placeholder="Search by customer name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="search-input"
-          />
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <div style={{ padding: 24, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <h1 style={{ fontSize: 28, fontWeight: 600, margin: 0 }}>Manage Bookings</h1>
+          {/* Add Booking button removed */}
         </div>
 
-        <div className="filters-group">
-          <select 
+        <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
+          <TextField
+            label="Search by client name"
+            variant="outlined"
+            value={searchQuery}
+            onChange={handleSearch}
+            style={{ flex: 1 }}
+          />
+          <TextField
+            select
+            label="Status"
+            variant="outlined"
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="filter-select"
+            onChange={handleFilterStatus}
+            SelectProps={{ native: true }}
+            style={{ width: 200 }}
           >
-            <option value="">All Status</option>
+            <option value="">All</option>
             <option value="pending">Pending</option>
             <option value="confirmed">Confirmed</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-
-          {/* Use MUI DatePicker with unavailable days */}
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <DatePicker
-              value={filterDate ? dayjs(filterDate) : null}
-              onChange={(newValue) => {
-                setFilterDate(newValue ? newValue.format('YYYY-MM-DD') : '');
-              }}
-              slotProps={{
-                textField: {
-                  fullWidth: false,
-                  size: 'small',
-                  sx: {
-                    minWidth: 140,
-                    backgroundColor: 'white',
-                    borderRadius: '8px',
-                  }
-                }
-              }}
-              shouldDisableDate={(date) => {
-                const dateStr = date.format('YYYY-MM-DD');
-                return bookedDates.includes(dateStr);
-              }}
-              slots={{
-                day: (dayProps) => {
-                  const dateStr = dayProps.day.format('YYYY-MM-DD');
-                  const isBooked = bookedDates.includes(dateStr);
-                  if (isBooked) {
-                    return (
-                      <Tooltip title="Unavailable" arrow>
-                        <span>
-                          <PickersDay
-                            {...dayProps}
-                            sx={{
-                              backgroundColor: '#fee2e2',
-                              color: '#991b1b',
-                              '&:hover': {
-                                backgroundColor: '#fecaca',
-                              },
-                              '&.Mui-disabled': {
-                                backgroundColor: '#fee2e2',
-                                color: '#991b1b',
-                              }
-                            }}
-                          />
-                        </span>
-                      </Tooltip>
-                    );
-                  }
-                  return <PickersDay {...dayProps} />;
-                }
-              }}
-            />
-          </LocalizationProvider>
-
-          {(searchQuery || filterStatus || filterDate) && (
-            <button 
-              className="clear-filters-btn"
-              onClick={() => {
-                setSearchQuery("");
-                setFilterStatus("");
-                setFilterDate("");
-              }}
-            >
-              Clear Filters
-            </button>
-          )}
+            <option value="canceled">Canceled</option>
+          </TextField>
+          <DatePicker
+            label="Filter by date"
+            value={filterDate}
+            onChange={handleFilterDate}
+            renderInput={(params) => <TextField {...params} variant="outlined" />}
+            disablePast
+            shouldDisableDate={isDateBooked}
+          />
         </div>
-      </div>
 
-      {/* Results count */}
-      <div className="results-info">
-        Showing {filteredBookings.length} of {bookings.length} bookings
-      </div>
+        {loading ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="loader"></div>
+          </div>
+        ) : (
+          <div style={{ flex: 1, overflowY: 'auto', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#f9fafb', height: 56 }}>
+                  <th style={{ textAlign: 'left', padding: '0 16px', fontSize: 16, fontWeight: 500 }}>ID</th>
+                  <th style={{ textAlign: 'left', padding: '0 16px', fontSize: 16, fontWeight: 500 }}>Client Name</th>
+                  <th style={{ textAlign: 'left', padding: '0 16px', fontSize: 16, fontWeight: 500 }}>Event Date</th>
+                  <th style={{ textAlign: 'left', padding: '0 16px', fontSize: 16, fontWeight: 500 }}>Event Time</th>
+                  <th style={{ textAlign: 'left', padding: '0 16px', fontSize: 16, fontWeight: 500 }}>Location</th>
+                  <th style={{ textAlign: 'left', padding: '0 16px', fontSize: 16, fontWeight: 500 }}>Status</th>
+                  <th style={{ textAlign: 'right', padding: '0 16px', fontSize: 16, fontWeight: 500 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(filteredBookings.length > 0 ? filteredBookings : bookings).map(booking => (
+                  <tr key={booking.booking_id} style={{ height: 72, borderBottom: '1px solid #e5e7eb' }}>
+                    <td style={{ padding: '0 16px', fontSize: 14 }}>{booking.booking_id}</td>
+                    <td style={{ padding: '0 16px', fontSize: 14 }}>{booking.client_name}</td>
+                    <td style={{ padding: '0 16px', fontSize: 14 }}>{new Date(booking.event_date).toLocaleDateString()}</td>
+                    <td style={{ padding: '0 16px', fontSize: 14 }}>{booking.event_time}</td>
+                    <td style={{ padding: '0 16px', fontSize: 14 }}>{booking.location}</td>
+                    <td style={{ padding: '0 16px', fontSize: 14 }}>
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: 12,
+                        fontSize: 14,
+                        fontWeight: 500,
+                        background: booking.status === 'confirmed' ? '#d1fae5' : booking.status === 'canceled' ? '#fee2e2' : '#e0f2fe',
+                        color: booking.status === 'confirmed' ? '#065f46' : booking.status === 'canceled' ? '#b91c1c' : '#0d9488'
+                      }}>
+                        {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0 16px', textAlign: 'right' }}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => handleEditClick(booking)}
+                        startIcon={<EditIcon />}
+                        style={{ borderRadius: 8, fontSize: 14 }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => updateStatus(booking.booking_id, booking.status === 'confirmed' ? 'canceled' : 'confirmed')}
+                        style={{
+                          marginLeft: 8,
+                          borderRadius: 8,
+                          fontSize: 14,
+                          background: booking.status === 'confirmed' ? '#f87171' : '#4ade80',
+                          color: '#fff'
+                        }}
+                      >
+                        {booking.status === 'confirmed' ? 'Cancel' : 'Confirm'}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      <table className="admin-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Client</th>
-            <th>Event Type</th>
-            <th>Package</th>
-            <th>Status</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredBookings.map(b => (
-            <tr key={b.booking_id}>
-              <td>{new Date(b.event_date).toLocaleDateString()}</td>
-              <td>
-                <div>{b.client_name}</div>
-                <small>{b.client_email}</small>
-              </td>
-              <td>{b.event_type}</td>
-              <td>{b.Package_Name}</td>
-              <td><span className={`badge ${b.status}`}>{b.status}</span></td>
-              <td style={{ display: 'flex', gap: 8 }}>
-                <select 
-                  value={b.status} 
-                  onChange={(e) => updateStatus(b.booking_id, e.target.value)}
-                >
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirm</option>
-                  <option value="completed">Complete</option>
-                  <option value="cancelled">Cancel</option>
-                </select>
-                {/* Use Material UI IconButton for Edit */}
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  size="small"
-                  startIcon={<EditIcon />}
-                  onClick={() => handleEditClick(b)}
-                  style={{ marginLeft: 4, minWidth: 0, padding: '4px 8px' }}
-                >
-                  Edit
-                </Button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {/* Edit Booking Modal (outside table for correct rendering) */}
-      <Modal open={editModalOpen} onClose={() => setEditModalOpen(false)}>
-        <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', bgcolor: 'background.paper', boxShadow: 24, p: 4, borderRadius: 2, minWidth: 320 }}>
-          <h3>Edit Booking</h3>
-          {/* Use DatePicker for event_date */}
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <DatePicker
-              label="Date"
-              value={editForm.event_date ? dayjs(editForm.event_date) : null}
-              onChange={(newValue) => {
-                setEditForm((prev) => ({
-                  ...prev,
-                  event_date: newValue ? newValue.format('YYYY-MM-DD') : ''
-                }));
-              }}
-              shouldDisableDate={(date) => {
-                const dateStr = date.format('YYYY-MM-DD');
-                // Allow the current booking's date, but disable other booked dates
-                return bookedDates.includes(dateStr) && dateStr !== editBooking?.event_date?.slice(0, 10);
-              }}
-              slots={{
-                day: (dayProps) => {
-                  const dateStr = dayProps.day.format('YYYY-MM-DD');
-                  const isBooked = bookedDates.includes(dateStr) && dateStr !== editBooking?.event_date?.slice(0, 10);
-                  if (isBooked) {
-                    return (
-                      <Tooltip title="Unavailable" arrow>
-                        <span>
-                          <PickersDay
-                            {...dayProps}
-                            sx={{
-                              backgroundColor: '#fee2e2',
-                              color: '#991b1b',
-                              '&:hover': {
-                                backgroundColor: '#fecaca',
-                              },
-                              '&.Mui-disabled': {
-                                backgroundColor: '#fee2e2',
-                                color: '#991b1b',
-                              }
-                            }}
-                          />
-                        </span>
-                      </Tooltip>
-                    );
-                  }
-                  return <PickersDay {...dayProps} />;
-                }
-              }}
-              slotProps={{
-                textField: {
-                  fullWidth: true,
-                  margin: "normal",
-                  InputLabelProps: { shrink: true }
-                }
-              }}
+        <Modal
+          open={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          aria-labelledby="edit-booking-modal"
+          aria-describedby="edit-booking-description"
+        >
+          <Box sx={{
+            width: 400,
+            bgcolor: 'background.paper',
+            borderRadius: 2,
+            boxShadow: 24,
+            p: 4,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2
+          }}>
+            <h2 id="edit-booking-modal" style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>Edit Booking</h2>
+            <TextField
+              label="Event Date"
+              type="date"
+              variant="outlined"
+              name="event_date"
+              value={editForm.event_date}
+              onChange={handleEditFormChange}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
             />
-          </LocalizationProvider>
-          <TextField
-            label="Time"
-            type="time"
-            name="event_time"
-            value={editForm.event_time}
-            onChange={handleEditFormChange}
-            fullWidth
-            margin="normal"
-            InputLabelProps={{ shrink: true }}
-          />
-          <TextField
-            label="Location"
-            name="location"
-            value={editForm.location}
-            onChange={handleEditFormChange}
-            fullWidth
-            margin="normal"
-          />
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 2 }}>
-            <Button onClick={() => setEditModalOpen(false)} color="secondary">Cancel</Button>
-            <Button onClick={handleEditSave} variant="contained" color="primary">Save</Button>
+            <TextField
+              label="Event Time"
+              type="time"
+              variant="outlined"
+              name="event_time"
+              value={editForm.event_time}
+              onChange={handleEditFormChange}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            />
+            <TextField
+              label="Location"
+              variant="outlined"
+              name="location"
+              value={editForm.location}
+              onChange={handleEditFormChange}
+              fullWidth
+            />
+            <Button
+              variant="contained"
+              onClick={handleEditSave}
+              style={{ borderRadius: 8, height: 54, fontSize: 16 }}
+            >
+              Save Changes
+            </Button>
           </Box>
-        </Box>
-      </Modal>
-      {/* Custom Alert */}
-      <CustomAlert
-        open={alert.open}
-        type={alert.type}
-        message={alert.message}
-        onClose={() => setAlert(a => ({ ...a, open: false }))}
-      />
-    </div>
+        </Modal>
+
+        <CustomAlert
+          open={alert.open}
+          type={alert.type}
+          message={alert.message}
+          onClose={() => setAlert(a => ({ ...a, open: false }))}
+        />
+      </div>
+    </LocalizationProvider>
   );
 }

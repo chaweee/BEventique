@@ -69,8 +69,51 @@ export default function DesignerLayoutModal({ isOpen, onClose, threadId, senderI
       canvas.on('object:modified', update);
       canvas.on('object:added', update);
       canvas.on('object:removed', update);
+      // If there's already canvas JSON loaded (from server), apply it
+      if (canvasData) {
+        try {
+          canvas.loadFromJSON(canvasData, () => {
+            canvas.getObjects().forEach(o => { try { if (typeof o.setCoords === 'function') o.setCoords(); } catch(e){} });
+            canvas.renderAll();
+            setCanvasData(canvas.toJSON());
+          });
+        } catch (e) {
+          console.warn('Failed to load canvasData on init:', e);
+        }
+      }
     }
   }, [isOpen]);
+
+  // Load saved layout JSON for this thread (customer uploaded) when modal opens
+  useEffect(() => {
+    if (!isOpen || !threadId) return;
+    const fetchLayoutJson = async () => {
+      try {
+        const res = await fetch(`http://localhost:3001/api/queries/layout/${encodeURIComponent(threadId)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data?.status === 'success' && data.layout_json) {
+          try {
+            const parsed = typeof data.layout_json === 'string' ? JSON.parse(data.layout_json) : data.layout_json;
+            setCanvasData(parsed);
+            // If canvas already exists, load immediately
+            if (fabricCanvasRef.current) {
+              fabricCanvasRef.current.loadFromJSON(parsed, () => {
+                fabricCanvasRef.current.getObjects().forEach(o => { try { if (typeof o.setCoords === 'function') o.setCoords(); } catch(e){} });
+                fabricCanvasRef.current.renderAll();
+                setCanvasData(fabricCanvasRef.current.toJSON());
+              });
+            }
+          } catch (e) {
+            console.warn('Failed to parse layout_json for thread', threadId, e);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch layout JSON for thread', threadId, err);
+      }
+    };
+    fetchLayoutJson();
+  }, [isOpen, threadId]);
 
   // simple helpers to add shapes (copied behavior from AddPackageModal)
   const addTable = () => {
@@ -164,8 +207,16 @@ export default function DesignerLayoutModal({ isOpen, onClose, threadId, senderI
       let layoutImage = null;
       try {
         if (fabricCanvasRef.current) {
+          // ensure opaque white background for export
+          const canvas = fabricCanvasRef.current;
+          const prevBg = canvas.backgroundColor;
+          try {
+            canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
+          } catch (e) {}
           // use a higher multiplier for better resolution
-          layoutImage = fabricCanvasRef.current.toDataURL({ format: 'jpeg', quality: 0.9 });
+          layoutImage = canvas.toDataURL({ format: 'jpeg', quality: 0.9, multiplier: 2 });
+          // restore previous background
+          try { canvas.setBackgroundColor(prevBg, canvas.renderAll.bind(canvas)); } catch (e) {}
         }
       } catch (e) {
         console.warn('Failed to create image from canvas:', e?.message || e);
