@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap');
+
 :root{
   --bg:#f6fbf8;
   --glass: rgba(255,255,255,0.9);
@@ -36,7 +38,7 @@ body::-webkit-scrollbar { display: none; }
 }
 
 .ch-brand-title {
-  margin:0; font-size:20px; font-weight:400; color:white; letter-spacing:0.5px; font-family:'Poppins', serif;
+  margin:0; font-size:20px; font-weight:400; color:white; letter-spacing:0.5px; font-family:'Great Vibes', cursive;
 }
 
 .ch-brand-subtitle {
