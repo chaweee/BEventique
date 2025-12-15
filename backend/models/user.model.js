@@ -11,7 +11,7 @@ class User {
    */
   static async findById(id) {
     const [rows] = await db.query(
-      'SELECT Account_ID as id, Email as email, Firstname, Lastname, Role, created_at FROM accounts WHERE Account_ID = ?',
+      'SELECT Account_ID as id, Email as email, Firstname, Lastname, Role, created_at FROM account WHERE Account_ID = ?',
       [id]
     );
     return rows[0] || null;
@@ -22,7 +22,7 @@ class User {
    */
   static async findByEmail(email) {
     const [rows] = await db.query(
-      'SELECT * FROM accounts WHERE Email = ?',
+      'SELECT * FROM account WHERE Email = ?',
       [email]
     );
     return rows[0] || null;
@@ -36,9 +36,9 @@ class User {
     
     let query = `
       SELECT Account_ID as id, Email as email, Firstname, Lastname, Role, created_at 
-      FROM accounts
+      FROM account
     `;
-    let countQuery = 'SELECT COUNT(*) as total FROM accounts';
+    let countQuery = 'SELECT COUNT(*) as total FROM account';
     const params = [];
     
     if (search) {
@@ -66,7 +66,7 @@ class User {
    */
   static async create({ email, password, firstname, lastname, role }) {
     const [result] = await db.query(
-      'INSERT INTO accounts (Email, Password, Firstname, Lastname, Role) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO account (Email, Password, Firstname, Lastname, Role) VALUES (?, ?, ?, ?, ?)',
       [email, password, firstname, lastname, role]
     );
     
@@ -106,7 +106,7 @@ class User {
     values.push(id);
     
     await db.query(
-      `UPDATE accounts SET ${fields.join(', ')} WHERE Account_ID = ?`,
+      `UPDATE account SET ${fields.join(', ')} WHERE Account_ID = ?`,
       values
     );
     
@@ -118,7 +118,7 @@ class User {
    */
   static async delete(id) {
     const [result] = await db.query(
-      'DELETE FROM accounts WHERE Account_ID = ?',
+      'DELETE FROM account WHERE Account_ID = ?',
       [id]
     );
     
@@ -129,7 +129,7 @@ class User {
    * Check if email exists
    */
   static async emailExists(email, excludeId = null) {
-    let query = 'SELECT COUNT(*) as count FROM accounts WHERE Email = ?';
+    let query = 'SELECT COUNT(*) as count FROM account WHERE Email = ?';
     const params = [email];
     
     if (excludeId) {

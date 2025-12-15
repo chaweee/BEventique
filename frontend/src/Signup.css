@@ -146,7 +146,7 @@ body {
   box-shadow: 0 28px 80px rgba(0,0,0,0.6);
   text-align:center;
 }
-.modal-card h3 { margin:0 0 8px; font-size:20px; color:var(--muted); }
+.modal-card h3 { margin:0 0 8px; font-size:20px; color:#ffffff; }
 .modal-card p { margin:0 0 12px; color: rgba(255,255,255,0.85); }
 .modal-actions { display:flex; justify-content:center; gap:12px; }
 

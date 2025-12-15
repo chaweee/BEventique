@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import "./DesignerQueries.css";
 import DesignerSidebar from "./DesignerSidebar";
+import DesignerLayoutModal from './DesignerLayoutModal';
+import LayoutIcon from './LayoutIcon';
 
 export default function DesignerQueries() {
   const navigate = useNavigate();
@@ -16,6 +18,7 @@ export default function DesignerQueries() {
   const [bookings, setBookings] = useState([]);
   const [selectedBooking, setSelectedBooking] = useState("");
   const [showNewQuery, setShowNewQuery] = useState(false);
+  const [showLayoutModal, setShowLayoutModal] = useState(false);
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -417,7 +420,7 @@ export default function DesignerQueries() {
             {!selectedThread ? (
               <div className="dq-no-selection">
                 <div className="empty-icon">💬</div>
-                <h2>Select a query</h2>
+                <h2>Select a inquiry</h2>
                 <p>Choose a customer query from the list to view the conversation</p>
               </div>
             ) : (
@@ -433,7 +436,7 @@ export default function DesignerQueries() {
                     </p>
                   </div>
                   <div className="conv-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <select
+                      <select
                       className={`thread-status-select${selectedThread.status === 'in_progress' ? ' brown' : ''}`}
                       value={selectedThread.status}
                       onChange={e => handleStatusChange(e.target.value)}
@@ -455,6 +458,7 @@ export default function DesignerQueries() {
                       <option value="in_progress">In Progress</option>
                       <option value="resolved">Resolved</option>
                     </select>
+                    {/* Create Layout moved next to Send button */}
                     <button className="dq-close-conv" onClick={closeConversation}>✕</button>
                   </div>
                 </div>
@@ -477,6 +481,25 @@ export default function DesignerQueries() {
                           <span className="message-time">{formatMessageTime(msg.created_at)}</span>
                         </div>
                         <div className="message-text">{msg.message}</div>
+                        {/* Render inline base64 preview if present */}
+                        {msg.layout_image && (
+                          <div className="message-layout">
+                            <img src={msg.layout_image} alt="layout preview" className="layout-preview" />
+                            <div style={{ marginTop: 8 }}>
+                              <a href={msg.layout_image} download={`layout_${msg.message_id || Date.now()}.jpg`} style={{ color: '#0ea5a4', fontWeight: 600 }}>Download layout</a>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Render stored revision if message references a saved revision */}
+                        {msg.design_revision_id && (
+                          <div className="message-layout">
+                            <img src={`/api/queries/design_revision/${msg.design_revision_id}/image`} alt="layout preview" className="layout-preview" />
+                            <div style={{ marginTop: 8 }}>
+                              <a href={`/api/queries/design_revision/${msg.design_revision_id}/image`} download={`layout_${msg.design_revision_id}.jpg`} style={{ color: '#0ea5a4', fontWeight: 600 }}>Download layout</a>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -485,14 +508,35 @@ export default function DesignerQueries() {
 
                 {/* Message Input */}
                 {selectedThread.status !== "closed" && (
-                  <form className="dq-message-input" onSubmit={handleSendMessage}>
+                  <form className="dq-message-input" onSubmit={handleSendMessage} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <input
                       type="text"
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
                       placeholder="Type your response..."
+                      style={{ flex: 1 }}
                     />
-                    <button type="submit">Send</button>
+                    <button
+                      type="button"
+                      onClick={() => setShowLayoutModal(true)}
+                      title="Create layout"   
+                      aria-label="Create layout"
+                      style={{
+                        width: 38,
+                        height: 38,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: 8,
+                        border: 'none',
+                        background: '#0ea5a4',
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                      }}
+                    >
+                      <LayoutIcon size={18} color="white" />
+                    </button>
+                    <button type="submit" style={{ padding: '10px 14px' }}>Send</button>
                   </form>
                 )}
               </>
@@ -616,6 +660,17 @@ export default function DesignerQueries() {
             </div>
           </div>
         )}
+        <DesignerLayoutModal
+          isOpen={showLayoutModal}
+          onClose={() => setShowLayoutModal(false)}
+          threadId={selectedThread?.thread_id}
+          senderId={getDesignerId()}
+          onSent={() => {
+            if (selectedThread) fetchMessages(selectedThread.thread_id);
+            fetchThreads();
+            setShowLayoutModal(false);
+          }}
+        />
       </main>
     </div>
   );

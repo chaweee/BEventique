@@ -8,10 +8,10 @@ const db = require('./connection');
 const logger = require('../utils/logger');
 
 /**
- * Create accounts table
+ * Create account table
  */
 const createAccountsTable = `
-  CREATE TABLE IF NOT EXISTS accounts (
+  CREATE TABLE IF NOT EXISTS account (
     Account_ID INT AUTO_INCREMENT PRIMARY KEY,
     Email VARCHAR(255) UNIQUE NOT NULL,
     Password VARCHAR(255) NOT NULL,
@@ -69,7 +69,7 @@ const createBookingsTable = `
     Total_Amount DECIMAL(10, 2),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (Account_ID) REFERENCES accounts(Account_ID) ON DELETE CASCADE,
+    FOREIGN KEY (Account_ID) REFERENCES account(Account_ID) ON DELETE CASCADE,
     FOREIGN KEY (Package_ID) REFERENCES packages(Package_ID) ON DELETE RESTRICT,
     INDEX idx_account (Account_ID),
     INDEX idx_status (Status),
@@ -90,9 +90,9 @@ const createDesignQueriesTable = `
     assigned_to INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (Account_ID) REFERENCES accounts(Account_ID) ON DELETE CASCADE,
+    FOREIGN KEY (Account_ID) REFERENCES account(Account_ID) ON DELETE CASCADE,
     FOREIGN KEY (Booking_ID) REFERENCES bookings(Booking_ID) ON DELETE SET NULL,
-    FOREIGN KEY (assigned_to) REFERENCES accounts(Account_ID) ON DELETE SET NULL,
+    FOREIGN KEY (assigned_to) REFERENCES account(Account_ID) ON DELETE SET NULL,
     INDEX idx_account (Account_ID),
     INDEX idx_status (Status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -111,7 +111,7 @@ const createQueryMessagesTable = `
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (Query_ID) REFERENCES design_queries(Query_ID) ON DELETE CASCADE,
-    FOREIGN KEY (Sender_ID) REFERENCES accounts(Account_ID) ON DELETE CASCADE,
+    FOREIGN KEY (Sender_ID) REFERENCES account(Account_ID) ON DELETE CASCADE,
     INDEX idx_query (Query_ID),
     INDEX idx_sender (Sender_ID)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -125,7 +125,7 @@ async function runMigrations() {
     logger.info('Starting database migrations...');
 
     await db.query(createAccountsTable);
-    logger.info('✓ Accounts table created/verified');
+    logger.info('✓ Account table created/verified');
 
     await db.query(createPackagesTable);
     logger.info('✓ Packages table created/verified');

@@ -75,7 +75,7 @@ router.post("/create", async (req, res) => {
         console.log("event_id to insert:", event_id);
         
         // Get Customer Full Name
-        const [customerRows] = await global.db.query("SELECT Firstname, Lastname, Email, PhoneNumber FROM accounts WHERE Account_ID = ?", [customer_id]);
+        const [customerRows] = await global.db.query("SELECT Firstname, Lastname, Email, PhoneNumber FROM account WHERE Account_ID = ?", [customer_id]);
         console.log("Customer query for Account_ID:", customer_id, "Result:", customerRows);
         const customerName = customerRows.length ? `${customerRows[0].Firstname} ${customerRows[0].Lastname}` : "Unknown Customer";
         const customerEmail = customerRows.length ? customerRows[0].Email : "";
@@ -142,7 +142,7 @@ router.get("/all", async (req, res) => {
                 p.Package_Name,
                 e.event_type
             FROM bookings b
-            JOIN accounts a ON b.customer_id = a.Account_ID
+            JOIN account a ON b.customer_id = a.Account_ID
             JOIN package p ON b.package_id = p.Package_ID
             LEFT JOIN event e ON b.event_id = e.event_id
             ORDER BY b.event_date ASC
@@ -237,21 +237,23 @@ router.patch("/status/:id", async (req, res) => {
 router.get('/designer/:designerId', async (req, res) => {
   try {
     const { designerId } = req.params;
-    const [bookings] = await db.query(
-      `SELECT b.*, 
-              c.Full_Name as customer_name,
-              p.Package_Name as package_name,
-              b.event_date,
-              b.event_type
-       FROM bookings b 
-       LEFT JOIN customers c ON b.customer_id = c.id 
-       LEFT JOIN packages p ON b.package_id = p.id
-       WHERE b.designer_id = ? 
-       ORDER BY b.event_date DESC, b.created_at DESC`,
-      [designerId]
-    );
-    
-    res.json({ status: 'success', bookings });
+        const sql = `
+            SELECT b.*,
+                         CONCAT(a.Firstname, ' ', a.Lastname) AS customer_name,
+                         a.Email AS customer_email,
+                         a.PhoneNumber AS customer_phone,
+                         p.Package_Name AS package_name,
+                         e.event_type
+            FROM bookings b
+            LEFT JOIN account a ON b.customer_id = a.Account_ID
+            LEFT JOIN package p ON b.package_id = p.Package_ID
+            LEFT JOIN event e ON b.event_id = e.event_id
+            WHERE b.designer_id = ?
+            ORDER BY b.event_date DESC, b.created_at DESC
+        `;
+
+        const [bookings] = await global.db.query(sql, [designerId]);
+        return res.json({ status: 'success', bookings });
   } catch (err) {
     console.error("Fetch bookings by designer error:", err);
     res.status(500).json({ status: "error", message: "Server error" });
